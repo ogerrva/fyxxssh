@@ -1,13 +1,13 @@
 {
   "name": "fyxxssh",
   "productName": "FYXXSSH",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "FYXXSSH - Ultimate High-Speed SSH & SFTP Workspace Client",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "web": "node server.js",
-    "build:portable": "npx electron-packager . FYXXSSH --platform=win32 --arch=x64 --icon=build/icon.ico --out=dist --overwrite --prune=true",
+    "build:portable": "npx electron-packager . FYXXSSH --platform=win32 --arch=x64 --icon=build/icon.ico --out=dist --overwrite --prune=true --asar --ignore=\"^/(dist|dist-installer|docs|\\.git)\"",
     "build:installer": "npx electron-builder --win nsis"
   },
   "keywords": [

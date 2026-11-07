@@ -1,6 +1,6 @@
 ; Script do Inno Setup para FYXXSSH
 #define MyAppName "FYXXSSH"
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "FYXX Technologies"
 #define MyAppURL "https://github.com/ogerrva/fyxxssh"
 #define MyAppExeName "FYXXSSH.exe"
@@ -16,7 +16,7 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=dist-installer
-OutputBaseFilename=FYXXSSH-Setup-v1.0.2
+OutputBaseFilename=FYXXSSH-Setup-v1.0.3
 SetupIconFile=build\icon.ico
 WizardImageFile=build\wizard.bmp
 WizardSmallImageFile=build\wizard-small.bmp
@@ -28,11 +28,11 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 
 ; Metadados do Executável para o Windows Explorer e SmartScreen
-VersionInfoVersion=1.0.2.0
+VersionInfoVersion=1.0.3.0
 VersionInfoCompany=FYXX Technologies
 VersionInfoDescription=FYXXSSH Setup
 VersionInfoProductName=FYXXSSH
-VersionInfoProductVersion=1.0.2.0
+VersionInfoProductVersion=1.0.3.0
 VersionInfoCopyright=Copyright (C) 2026 FYXX Technologies
 
 [Languages]
@@ -51,3 +51,4 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+

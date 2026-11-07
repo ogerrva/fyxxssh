@@ -1,0 +1,66 @@
+{
+  "name": "fyxxssh",
+  "productName": "FYXXSSH",
+  "version": "1.0.0",
+  "description": "FYXXSSH - Ultimate High-Speed SSH & SFTP Workspace Client",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "web": "node server.js",
+    "build:portable": "npx electron-packager . FYXXSSH --platform=win32 --arch=x64 --icon=build/icon.ico --out=dist --overwrite --prune=true",
+    "build:installer": "npx electron-builder --win nsis"
+  },
+  "keywords": [
+    "ssh",
+    "sftp",
+    "terminal",
+    "fyxxssh",
+    "workspaces",
+    "shortcuts",
+    "vps",
+    "server-management"
+  ],
+  "author": "FYXX",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "ssh2": "^1.16.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "^18.4.1",
+    "electron": "^40.8.0"
+  },
+  "build": {
+    "appId": "com.fyxxssh.app",
+    "productName": "FYXXSSH",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "server.js",
+      "public/**/*",
+      "build/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FYXXSSH",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    }
+  }
+}

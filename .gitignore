@@ -1,0 +1,14 @@
+# Dependências
+node_modules/
+package-lock.json
+
+# Builds e Instaladores
+dist/
+dist-installer/
+
+# Logs e Dados Temporários
+*.log
+AppData/
+data/storage.json
+.user_uploaded/
+.system_generated/

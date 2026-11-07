@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FYXXSSH</title>
+  <link rel="icon" type="image/png" href="icons/app-icon.png">
+  
+  <!-- CSS Principal & Temas -->
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- xterm.js CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-search@0.15.0/lib/addon-search.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="theme-obsidian">
+
+  <!-- BARRA DE TÍTULO CUSTOMIZADA (ESTILO ELECTRON FRAMELESS) -->
+  <div class="window-titlebar">
+    <div class="window-title-left">
+      <div class="brand-logo">
+        <img src="images/logo.png" class="brand-logo-img" alt="FYXXSSH" />
+      </div>
+      <span class="brand-name">FYXX<strong>SSH</strong></span>
+      <span class="app-version-pill">v1.0 Pro</span>
+    </div>
+
+    <div class="window-title-center">
+      <div class="quick-status-tag" id="globalStatusTag">
+        <span class="status-pulse-dot"></span>
+        <span id="globalStatusText">Desconectado</span>
+      </div>
+    </div>
+
+    <div class="window-title-controls">
+      <button class="win-btn" onclick="openModal('settingsModal')" title="Temas & Layouts">
+        <i data-lucide="palette"></i>
+      </button>
+      <button class="win-btn" onclick="winMinimize()" title="Minimizar">
+        <i data-lucide="minus"></i>
+      </button>
+      <button class="win-btn" onclick="winMaximize()" title="Maximizar">
+        <i data-lucide="square"></i>
+      </button>
+      <button class="win-btn close" onclick="winClose()" title="Fechar">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTAINER PRINCIPAL DO APLICATIVO -->
+  <div class="app-container">
+
+    <!-- SIDEBAR RETRÁTIL -->
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-top">
+        <button class="sidebar-nav-btn active" id="navHomeBtn" onclick="switchMainView('home')" title="Início / Atalhos">
+          <i data-lucide="layout-grid"></i>
+          <span>Dashboard</span>
+        </button>
+        <button class="sidebar-nav-btn" id="navSessionBtn" onclick="switchMainView('session')" title="Sessão Ativa" style="display:none;">
+          <i data-lucide="monitor-play"></i>
+          <span>Sessão Ativa</span>
+        </button>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section-title">
+        <span>SERVIDORES SSH</span>
+        <button class="icon-btn-small" title="Adicionar Servidor" onclick="openHostModal()">
+          <i data-lucide="plus"></i>
+        </button>
+      </div>
+
+      <div id="sidebarHostsList" class="sidebar-hosts-list">
+        <!-- Preenchido dinamicamente -->
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="connection-status-pill online">
+          <span class="status-dot"></span>
+          <span class="status-text">Pronto para Conectar</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ÁREA DE TRABALHO PRINCIPAL -->
+    <main class="app-main">
+      
+      <!-- HEADER SUPERIOR COM AÇÕES RÁPIDAS -->
+      <header class="app-topbar">
+        <div class="topbar-left">
+          <button class="icon-btn" onclick="toggleSidebar()" title="Ocultar/Exibir Sidebar">
+            <i data-lucide="panel-left"></i>
+          </button>
+          <div class="active-breadcrumbs" id="activeBreadcrumbs">
+            <span class="crumb-root">Início</span>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <button class="btn-action-primary" onclick="openShortcutModal()">
+            <i data-lucide="folder-plus"></i>
+            <span>+ Atalho de Pasta</span>
+          </button>
+          <button class="btn-action-secondary" onclick="openHostModal()">
+            <i data-lucide="server"></i>
+            <span>+ Servidor</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- CONTEÚDO DAS VIEWS -->
+      <div class="tab-content-wrapper">
+        
+        <!-- VIEW 1: HOME & DASHBOARD CLEAN -->
+        <div id="homeView" class="view-panel active">
+          
+          <!-- BARRA SUPERIOR MINIMALISTA COM MÉTRICAS E BUSCA -->
+          <div class="clean-home-topbar">
+            <div class="home-topbar-left">
+              <div class="clean-stat-badge">
+                <i data-lucide="folder-symlink"></i>
+                <span id="statShortcutCount">0</span>
+                <span class="stat-label">Atalhos</span>
+              </div>
+              <div class="clean-stat-badge">
+                <i data-lucide="server"></i>
+                <span id="statHostCount">0</span>
+                <span class="stat-label">Servidores</span>
+              </div>
+            </div>
+
+            <div class="home-topbar-right">
+              <div class="clean-search-box">
+                <i data-lucide="search"></i>
+                <input type="text" id="homeSearchInput" placeholder="Buscar atalhos ou servidores..." oninput="handleHomeSearch(this.value)" />
+              </div>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 1: ATALHOS RÁPIDOS DE DIRETÓRIOS -->
+          <div class="content-section clean-section">
+            <div class="section-header-clean">
+              <div class="section-title-clean">
+                <i data-lucide="folder-symlink"></i>
+                <h2>Atalhos de Diretórios Remotos</h2>
+              </div>
+              <div class="section-actions-clean">
+                <select id="shortcutHostFilter" class="select-clean" onchange="filterShortcutsByHost()">
+                  <option value="ALL">Todos os Servidores</option>
+                </select>
+                <button class="btn-clean-mini" onclick="openShortcutModal()">
+                  <i data-lucide="plus"></i> Novo Atalho
+                </button>
+              </div>
+            </div>
+
+            <div id="shortcutsGrid" class="shortcuts-grid">
+              <!-- Renderizado dinamicamente -->
+            </div>
+          </div>
+
+          <!-- SEÇÃO 2: SERVIDORES CADASTRADOS -->
+          <div class="content-section clean-section mt-4" id="hostsSectionContainer">
+            <div class="section-header-clean">
+              <div class="section-title-clean">
+                <i data-lucide="server"></i>
+                <h2>Servidores SSH Salvos</h2>
+              </div>
+              <button class="btn-clean-mini" onclick="openHostModal()">
+                <i data-lucide="plus"></i> Adicionar Servidor
+              </button>
+            </div>
+
+            <div id="hostsGrid" class="hosts-grid">
+              <!-- Renderizado dinamicamente -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- VIEW 2: SESSÃO ATIVA (TERMINAL / SFTP / SPLIT) -->
+        <div id="sessionView" class="view-panel">
+          
+          <!-- BARRA DE FERRAMENTAS DA SESSÃO -->
+          <div class="session-toolbar">
+            <div class="session-host-info">
+              <div class="session-status-bullet online"></div>
+              <span class="session-hostname" id="sessionHostTitle">Conectando...</span>
+              <span class="session-path-badge" id="sessionPathBadge" title="Diretório Remoto Atual">/root</span>
+              <button class="btn-pin-shortcut" onclick="pinCurrentPathAsShortcut()" title="Salvar este diretório remoto como atalho na Home">
+                <i data-lucide="bookmark-plus"></i>
+                <span>Salvar Atalho</span>
+              </button>
+            </div>
+
+            <!-- CONTROLES DE LAYOUT -->
+            <div class="layout-switch-group">
+              <button class="layout-btn active" id="layoutSplitVBtn" onclick="setSessionLayout('split-vertical')" title="Lado a Lado (Vertical)">
+                <i data-lucide="columns-2"></i>
+              </button>
+              <button class="layout-btn" id="layoutSplitHBtn" onclick="setSessionLayout('split-horizontal')" title="Dividido Horizontalmente">
+                <i data-lucide="rows-2"></i>
+              </button>
+              <button class="layout-btn" id="layoutTermBtn" onclick="setSessionLayout('terminal-focus')" title="Foco no Terminal">
+                <i data-lucide="terminal"></i>
+              </button>
+              <button class="layout-btn" id="layoutSftpBtn" onclick="setSessionLayout('sftp-focus')" title="Foco nos Arquivos">
+                <i data-lucide="folder-tree"></i>
+              </button>
+            </div>
+
+            <!-- BOTÃO SAIR / DESCONECTAR -->
+            <button class="btn-disconnect" onclick="closeActiveSession()">
+              <i data-lucide="power"></i>
+              <span>Desconectar</span>
+            </button>
+          </div>
+
+          <!-- MINI TELEMETRIA VPS EM TEMPO REAL -->
+          <div class="vps-telemetry-bar" id="vpsTelemetryBar">
+            <div class="telemetry-item">
+              <i data-lucide="cpu" class="telemetry-icon"></i>
+              <span class="telemetry-label">CPU:</span>
+              <span id="statCpu" class="telemetry-value">--%</span>
+            </div>
+            <div class="telemetry-item">
+              <i data-lucide="activity" class="telemetry-icon"></i>
+              <span class="telemetry-label">RAM:</span>
+              <span id="statRam" class="telemetry-value">-- / --</span>
+            </div>
+            <div class="telemetry-item">
+              <i data-lucide="hard-drive" class="telemetry-icon"></i>
+              <span class="telemetry-label">Disco:</span>
+              <span id="statDisk" class="telemetry-value">--</span>
+            </div>
+            <div class="telemetry-item">
+              <i data-lucide="clock" class="telemetry-icon"></i>
+              <span class="telemetry-label">Uptime:</span>
+              <span id="statUptime" class="telemetry-value">--</span>
+            </div>
+            <button class="telemetry-refresh-btn" onclick="fetchVpsStats()" title="Atualizar Métricas">
+              <i data-lucide="refresh-cw"></i>
+            </button>
+          </div>
+
+          <!-- BARRA DE QUICK ACTIONS POR ATALHO -->
+          <div class="snippets-bar" id="sessionSnippetsBar">
+            <span class="snippets-title"><i data-lucide="zap"></i> Comandos Rápidos:</span>
+            <div class="snippets-container" id="sessionSnippetsList"></div>
+          </div>
+
+          <!-- ÁREA MODULAR DE SESSÃO -->
+          <div id="sessionSplitArea" class="session-split-area layout-split-vertical">
+            
+            <!-- PAINEL TERMINAL -->
+            <div id="terminalPane" class="session-pane terminal-pane">
+              <div class="pane-header">
+                <div class="pane-title">
+                  <i data-lucide="terminal"></i> 
+                  <span>Terminal Interativo</span>
+                </div>
+                <div class="pane-tools">
+                  <div class="terminal-search-box" id="terminalSearchBox" style="display:none;">
+                    <input type="text" id="termSearchInput" placeholder="Buscar no terminal..." onkeydown="handleTermSearch(event)" />
+                    <button class="icon-btn-tiny" onclick="searchTerminalNext()"><i data-lucide="chevron-down"></i></button>
+                    <button class="icon-btn-tiny" onclick="closeTermSearch()">&times;</button>
+                  </div>
+                  <button class="icon-btn-tiny" onclick="toggleTermSearch()" title="Buscar texto (Ctrl+F)"><i data-lucide="search"></i></button>
+                  <button class="icon-btn-tiny" onclick="pasteToTerminal()" title="Colar (Ctrl+V)"><i data-lucide="clipboard"></i></button>
+                  <button class="icon-btn-tiny" onclick="clearActiveTerminal()" title="Limpar tela"><i data-lucide="eraser"></i></button>
+                </div>
+              </div>
+              <div id="xtermContainer" class="xterm-container" oncontextmenu="handleTerminalContextMenu(event)"></div>
+            </div>
+
+            <!-- PAINEL SFTP COM DRAG & DROP NATIVO E NAVEGAÇÃO PRO -->
+            <div id="sftpPane" class="session-pane sftp-pane">
+              <div class="pane-header sftp-header">
+                <!-- NAVEGAÇÃO ENTRE PASTAS (HISTÓRICO BACK / FORWARD / UP) -->
+                <div class="sftp-nav-controls">
+                  <button class="icon-btn-tool" id="btnSftpBack" onclick="sftpNavigateBack()" title="Voltar (Alt+Esquerda)">
+                    <i data-lucide="arrow-left"></i>
+                  </button>
+                  <button class="icon-btn-tool" id="btnSftpForward" onclick="sftpNavigateForward()" title="Avançar (Alt+Direita)">
+                    <i data-lucide="arrow-right"></i>
+                  </button>
+                  <button class="icon-btn-tool" id="btnSftpUp" onclick="goToParentDirectory()" title="Subir um nível (cd ..)">
+                    <i data-lucide="arrow-up"></i>
+                  </button>
+                  <button class="icon-btn-tool" onclick="refreshSftpList()" title="Atualizar (F5)">
+                    <i data-lucide="refresh-cw"></i>
+                  </button>
+                </div>
+
+                <!-- BREADCRUMB E INPUT DIRETO DE CAMINHO -->
+                <div class="sftp-path-bar" id="sftpPathBarContainer">
+                  <div class="breadcrumb-container" id="sftpBreadcrumbs" onclick="enableDirectPathInput()"></div>
+                  <input type="text" id="sftpDirectPathInput" class="sftp-direct-path-input" style="display:none;" onkeydown="handleDirectPathKey(event)" onblur="disableDirectPathInput()" placeholder="/caminho/completo/remoto" />
+                  <button class="icon-btn-tiny sftp-edit-path-btn" onclick="enableDirectPathInput()" title="Editar caminho diretamente">
+                    <i data-lucide="edit-3"></i>
+                  </button>
+                </div>
+
+                <!-- AÇÕES DA BARRA SFTP -->
+                <div class="sftp-toolbar-actions">
+                  <button class="icon-btn-tool" onclick="pinCurrentPathAsShortcut()" title="Salvar pasta atual como Atalho na Home">
+                    <i data-lucide="bookmark-plus"></i>
+                  </button>
+                  <button class="icon-btn-tool" onclick="openNewFolderModal()" title="Nova Pasta">
+                    <i data-lucide="folder-plus"></i>
+                  </button>
+                  <label class="icon-btn-tool" title="Upload de Arquivos (Suporta múltiplos)">
+                    <i data-lucide="upload"></i>
+                    <input type="file" id="sftpUploadInput" multiple onchange="handleFileUpload(event)" style="display:none;">
+                  </label>
+                </div>
+              </div>
+
+              <div class="sftp-file-table-wrapper" id="sftpDropZone">
+                <div class="drop-overlay" id="dropOverlay">
+                  <i data-lucide="upload-cloud" style="width:40px;height:40px;margin-bottom:6px;"></i>
+                  <span>Solte os arquivos aqui para upload na pasta atual</span>
+                </div>
+                <table class="sftp-file-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 48%;">Nome</th>
+                      <th style="width: 14%;">Tamanho</th>
+                      <th style="width: 24%;">Modificado</th>
+                      <th style="width: 14%;">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sftpFileList"></tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- MENU DE CONTEXTO DO TERMINAL (BOTÃO DIREITO) -->
+  <div id="terminalContextMenu" class="context-menu">
+    <div class="context-menu-item" onclick="pasteToTerminal()">
+      <i data-lucide="clipboard"></i>
+      <span>Colar</span>
+      <span class="context-menu-shortcut">Ctrl+V</span>
+    </div>
+    <div class="context-menu-item" onclick="copyTerminalSelection()">
+      <i data-lucide="copy"></i>
+      <span>Copiar Seleção</span>
+      <span class="context-menu-shortcut">Ctrl+C</span>
+    </div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" onclick="toggleTermSearch()">
+      <i data-lucide="search"></i>
+      <span>Localizar...</span>
+      <span class="context-menu-shortcut">Ctrl+F</span>
+    </div>
+    <div class="context-menu-item" onclick="selectAllTerminal()">
+      <i data-lucide="check-square"></i>
+      <span>Selecionar Tudo</span>
+    </div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" onclick="clearActiveTerminal()">
+      <i data-lucide="eraser"></i>
+      <span>Limpar Terminal</span>
+    </div>
+  </div>
+
+  <!-- MENU DE CONTEXTO DO SFTP (BOTÃO DIREITO SOBRE ARQUIVOS E PASTAS) -->
+  <div id="sftpContextMenu" class="context-menu">
+    <div id="sftpCtxHeader" class="context-menu-header">
+      <span id="sftpCtxItemName">arquivo.txt</span>
+    </div>
+    
+    <!-- Opções para Arquivos -->
+    <div id="sftpCtxFileActions">
+      <div class="context-menu-item" onclick="handleSftpCtxEdit()">
+        <i data-lucide="edit-3"></i>
+        <span>Editar Arquivo</span>
+      </div>
+      <div class="context-menu-item" onclick="handleSftpCtxDownload()">
+        <i data-lucide="download"></i>
+        <span>Baixar para o Windows</span>
+      </div>
+      <div class="context-menu-item" onclick="handleSftpCtxDuplicate()">
+        <i data-lucide="copy"></i>
+        <span>Criar Cópia (Duplicar)</span>
+      </div>
+    </div>
+
+    <!-- Opções para Pastas -->
+    <div id="sftpCtxFolderActions" style="display:none;">
+      <div class="context-menu-item" onclick="handleSftpCtxOpenFolder()">
+        <i data-lucide="folder-open"></i>
+        <span>Abrir Pasta</span>
+      </div>
+      <div class="context-menu-item" onclick="handleSftpCtxCdTerminal()">
+        <i data-lucide="terminal"></i>
+        <span>Navegar no Terminal (cd)</span>
+      </div>
+      <div class="context-menu-item" onclick="handleSftpCtxPinShortcut()">
+        <i data-lucide="bookmark-plus"></i>
+        <span>Salvar como Atalho na Home</span>
+      </div>
+    </div>
+
+    <div class="context-menu-separator"></div>
+
+    <div class="context-menu-item" onclick="handleSftpCtxRename()">
+      <i data-lucide="type"></i>
+      <span>Renomear</span>
+    </div>
+    <div class="context-menu-item" onclick="handleSftpCtxCopyPath()">
+      <i data-lucide="clipboard-copy"></i>
+      <span>Copiar Caminho Remoto</span>
+    </div>
+    <div class="context-menu-item" onclick="handleSftpCtxChmod()">
+      <i data-lucide="shield"></i>
+      <span>Permissões (chmod)</span>
+    </div>
+
+    <div class="context-menu-separator"></div>
+
+    <div class="context-menu-item danger" onclick="handleSftpCtxDelete()">
+      <i data-lucide="trash-2"></i>
+      <span>Excluir Permanentemente</span>
+    </div>
+  </div>
+
+  <!-- ================= MODAIS ================= -->
+
+  <!-- MODAL DE CONFIRMAÇÃO ESTILIZADO (ZERO POPUP NATIVO DO WINDOWS) -->
+  <div id="confirmModal" class="modal-overlay">
+    <div class="modal-card modal-sm confirm-card">
+      <div class="confirm-header">
+        <div class="confirm-icon-box">
+          <i data-lucide="alert-triangle"></i>
+        </div>
+        <h3 id="confirmModalTitle">Confirmar Ação</h3>
+      </div>
+      <p id="confirmModalMessage" class="confirm-message">Deseja realmente prosseguir com esta ação?</p>
+      <div class="modal-footer confirm-footer">
+        <button type="button" class="btn-secondary" id="confirmModalCancelBtn" onclick="closeConfirmModal(false)">Cancelar</button>
+        <button type="button" class="btn-danger" id="confirmModalOkBtn" onclick="closeConfirmModal(true)">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFLITO DE ARQUIVOS (SOBREPOSIÇÃO / MESMO NOME) -->
+  <div id="fileConflictModal" class="modal-overlay">
+    <div class="modal-card modal-md conflict-card">
+      <div class="modal-header">
+        <div class="conflict-header-title">
+          <i data-lucide="copy" class="text-warning"></i>
+          <span>Conflito de Arquivo no Destino</span>
+        </div>
+      </div>
+      <div class="conflict-body">
+        <p class="conflict-desc">Já existe um arquivo com este nome no diretório remoto:</p>
+        <div class="conflict-file-box">
+          <i data-lucide="file-warning" class="conflict-icon"></i>
+          <span id="conflictFileName" class="conflict-name">arquivo.zip</span>
+        </div>
+        <p class="conflict-sub">Escolha como deseja proceder com esta transferência:</p>
+
+        <div class="conflict-options">
+          <button type="button" class="conflict-btn overwrite" onclick="resolveConflict('overwrite')">
+            <i data-lucide="refresh-cw"></i>
+            <div>
+              <strong>Substituir / Sobrescrever</strong>
+              <span>Substitui o arquivo existente pelo novo</span>
+            </div>
+          </button>
+
+          <button type="button" class="conflict-btn rename" onclick="resolveConflict('rename')">
+            <i data-lucide="file-plus"></i>
+            <div>
+              <strong>Criar Cópia (Renomear)</strong>
+              <span>Salva mantendo ambos com sufixo numérico</span>
+            </div>
+          </button>
+
+          <button type="button" class="conflict-btn skip" onclick="resolveConflict('skip')">
+            <i data-lucide="skip-forward"></i>
+            <div>
+              <strong>Pular Arquivo</strong>
+              <span>Não transfere este arquivo e continua a fila</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="conflict-apply-all">
+          <label class="custom-checkbox">
+            <input type="checkbox" id="conflictApplyToAll">
+            <span>Aplicar esta ação para todos os próximos arquivos em conflito</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="resolveConflict('cancel')">Cancelar Transferência</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: RENOMEAR ARQUIVO OU PASTA -->
+  <div id="renameModal" class="modal-overlay">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3><i data-lucide="type"></i> Renomear</h3>
+        <button class="modal-close-btn" onclick="closeModal('renameModal')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>Novo Nome</label>
+        <input type="text" id="renameInput" placeholder="Digite o novo nome..." required />
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('renameModal')">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="submitRenameItem()">Salvar Novo Nome</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PERMISSÕES (CHMOD) -->
+  <div id="chmodModal" class="modal-overlay">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3><i data-lucide="shield"></i> Permissões Remotas</h3>
+        <button class="modal-close-btn" onclick="closeModal('chmodModal')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>Código Octal de Permissão (ex: 755, 644, 777)</label>
+        <input type="text" id="chmodInput" placeholder="755" maxlength="4" style="font-family:monospace;font-size:16px;text-align:center;letter-spacing:2px;" required />
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('chmodModal')">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="submitChmodItem()">Aplicar Permissões</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TEMAS E LAYOUTS -->
+  <div id="settingsModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i data-lucide="palette"></i> Temas & Modelos de Layout</h3>
+        <button class="modal-close-btn" onclick="closeModal('settingsModal')">&times;</button>
+      </div>
+
+      <div class="form-group">
+        <label>Tema de Cores da Interface</label>
+        <div class="theme-options-grid">
+          <div class="theme-card active" id="theme-card-obsidian" onclick="applyTheme('obsidian')">
+            <div class="theme-preview obsidian"></div>
+            <span>Deep Obsidian</span>
+          </div>
+          <div class="theme-card" id="theme-card-cyberpunk" onclick="applyTheme('cyberpunk')">
+            <div class="theme-preview cyberpunk"></div>
+            <span>Cyberpunk Neon</span>
+          </div>
+          <div class="theme-card" id="theme-card-dracula" onclick="applyTheme('dracula')">
+            <div class="theme-preview dracula"></div>
+            <span>Dracula Night</span>
+          </div>
+          <div class="theme-card" id="theme-card-nordic" onclick="applyTheme('nordic')">
+            <div class="theme-preview nordic"></div>
+            <span>Nordic Frost</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Modelo Padrão de Divisão ao Abrir Atalho</label>
+        <div class="layout-selection-group">
+          <label class="radio-label">
+            <input type="radio" name="defaultLayout" value="split-vertical" checked onchange="setSessionLayout('split-vertical')" />
+            <span>Split Vertical (Terminal + SFTP lado a lado)</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="defaultLayout" value="split-horizontal" onchange="setSessionLayout('split-horizontal')" />
+            <span>Split Horizontal (Terminal em cima, SFTP embaixo)</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="defaultLayout" value="terminal-focus" onchange="setSessionLayout('terminal-focus')" />
+            <span>Terminal Focus (Maximizar Terminal)</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="defaultLayout" value="sftp-focus" onchange="setSessionLayout('sftp-focus')" />
+            <span>SFTP Focus (Maximizar Explorador de Arquivos)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-primary" onclick="closeModal('settingsModal')">Pronto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVO / EDITAR ATALHO DE DIRETÓRIO -->
+  <div id="shortcutModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="shortcutModalTitle">Novo Atalho de Pasta</h3>
+        <button class="modal-close-btn" onclick="closeModal('shortcutModal')">&times;</button>
+      </div>
+      <form id="shortcutForm" onsubmit="handleSaveShortcut(event)">
+        <input type="hidden" id="scEditId" value="" />
+
+        <div class="form-group">
+          <label>Selecione o Servidor</label>
+          <select id="scHostSelect" required></select>
+        </div>
+
+        <div class="form-group">
+          <label>Nome do Atalho</label>
+          <input type="text" id="scName" placeholder="Ex: Backend API, Web Frontend, Nginx" required />
+        </div>
+
+        <div class="form-group">
+          <label>Caminho do Diretório Remoto</label>
+          <div class="input-with-icon">
+            <i data-lucide="folder"></i>
+            <input type="text" id="scPath" placeholder="/opt/fyxxdrops-web/ ou /var/www/html" oninput="autoFillShortcutNameFromPath(this.value)" required />
+          </div>
+          <span class="field-hint">O terminal e o explorador abrirão instantaneamente neste diretório.</span>
+        </div>
+
+        <div class="form-group">
+          <label>Ações Rápidas (Opcional - 1 por linha: Nome | comando)</label>
+          <textarea id="scSnippetsText" placeholder="Deploy | git pull &amp;&amp; npm run build&#10;Restart | pm2 restart all&#10;Logs | tail -f app.log"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Descrição (Opcional)</label>
+          <input type="text" id="scDesc" placeholder="Breve anotação do projeto" />
+        </div>
+
+        <div class="form-group">
+          <label>Cor Identificadora</label>
+          <div class="color-picker-row">
+            <input type="color" id="scColor" value="#10b981" />
+            <span class="color-preview-text">Badge visual do atalho</span>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('shortcutModal')">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btnSaveShortcutSubmit">Salvar Atalho</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVO / EDITAR SERVIDOR -->
+  <div id="hostModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="hostModalTitle">Cadastrar Servidor SSH</h3>
+        <button class="modal-close-btn" onclick="closeModal('hostModal')">&times;</button>
+      </div>
+      <form id="hostForm" onsubmit="handleSaveHost(event)">
+        <input type="hidden" id="hostEditId" value="" />
+        
+        <div class="form-group">
+          <label>Nome do Servidor</label>
+          <input type="text" id="hostName" placeholder="Ex: Produção Contabo, AWS Principal, VPS Dev" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-3">
+            <label>Endereço IP ou Domínio</label>
+            <input type="text" id="hostAddress" placeholder="Ex: 192.168.1.100 ou servidor.com" required />
+          </div>
+          <div class="form-group flex-1">
+            <label>Porta SSH</label>
+            <input type="number" id="hostPort" value="22" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Usuário Remoto</label>
+          <input type="text" id="hostUser" value="root" required />
+        </div>
+
+        <div class="form-group">
+          <label>Tipo de Autenticação</label>
+          <div class="radio-group">
+            <label><input type="radio" name="authType" value="password" checked onchange="toggleAuthTypeUI()" /> Senha</label>
+            <label><input type="radio" name="authType" value="key" onchange="toggleAuthTypeUI()" /> Chave Privada (SSH Key)</label>
+          </div>
+        </div>
+
+        <div class="form-group" id="authPasswordGroup">
+          <label>Senha</label>
+          <input type="password" id="hostPassword" placeholder="Sua senha do SSH" />
+        </div>
+
+        <div class="form-group" id="authKeyGroup" style="display:none;">
+          <label>Chave Privada OpenSSH (Cole o conteúdo da chave)</label>
+          <textarea id="hostPrivateKey" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Cor</label>
+            <input type="color" id="hostColor" value="#3b82f6" />
+          </div>
+          <div class="form-group flex-1 test-btn-container">
+            <label>&nbsp;</label>
+            <button type="button" class="btn-secondary" onclick="testHostConnection()">
+              <i data-lucide="activity"></i> Testar Conexão
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('hostModal')">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btnSaveHostSubmit">Salvar Servidor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVA PASTA SFTP -->
+  <div id="folderModal" class="modal-overlay">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3>Criar Nova Pasta</h3>
+        <button class="modal-close-btn" onclick="closeModal('folderModal')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>Nome do Diretório</label>
+        <input type="text" id="newFolderName" placeholder="Ex: logs, build, backend" required />
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('folderModal')">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="submitCreateFolder()">Criar Pasta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDITOR DE ARQUIVO -->
+  <div id="editorModal" class="modal-overlay">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div class="editor-header-title">
+          <i data-lucide="file-code"></i>
+          <span id="editorFilePath">/caminho/do/arquivo</span>
+        </div>
+        <button class="modal-close-btn" onclick="closeModal('editorModal')">&times;</button>
+      </div>
+      <div class="editor-body">
+        <textarea id="remoteFileContent" spellcheck="false"></textarea>
+      </div>
+      <div class="modal-footer">
+        <span id="editorSaveStatus" class="editor-status-text"></span>
+        <button type="button" class="btn-secondary" onclick="closeModal('editorModal')">Fechar</button>
+        <button type="button" class="btn-primary" onclick="saveRemoteFile()">
+          <i data-lucide="save"></i> Salvar no Servidor
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATIONS -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

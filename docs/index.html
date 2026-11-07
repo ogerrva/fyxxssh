@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FYXXSSH — O Cliente SSH & SFTP Definitivo com Atalhos de Pastas</title>
+  <meta name="description" content="FYXXSSH é o cliente SSH & SFTP moderno para Windows com navegação por atalhos de pastas, drag & drop bidirecional e alta velocidade.">
+  <link rel="icon" type="image/png" href="logo.png">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      --bg: #07050d;
+      --card-bg: rgba(22, 14, 38, 0.7);
+      --card-border: rgba(168, 85, 247, 0.2);
+      --card-hover: rgba(168, 85, 247, 0.4);
+      --purple: #a855f7;
+      --purple-glow: rgba(168, 85, 247, 0.6);
+      --cyan: #00e5ff;
+      --text: #f3e8ff;
+      --text-muted: #9f8bb8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* BACKGROUND GLOW EFFECTS */
+    .bg-glow-1 {
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.22) 0%, rgba(13, 10, 23, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bg-glow-2 {
+      position: fixed;
+      bottom: -150px;
+      right: 10%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(147, 51, 234, 0.18) 0%, rgba(7, 5, 13, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* CONTAINER */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* NAVBAR */
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 0;
+      border-bottom: 1px solid rgba(168, 85, 247, 0.15);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: #fff;
+    }
+
+    .brand img {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
+    }
+
+    .brand span {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .brand span strong {
+      color: var(--purple);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .nav-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-link:hover {
+      color: #fff;
+    }
+
+    .btn-nav-download {
+      background: linear-gradient(135deg, #a855f7, #6366f1);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+      transition: transform 0.2s, box-shadow 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-nav-download:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 30px rgba(168, 85, 247, 0.6);
+    }
+
+    /* HERO */
+    .hero {
+      text-align: center;
+      padding: 90px 0 60px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(168, 85, 247, 0.12);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 100px;
+      font-size: 13px;
+      color: #d8b4fe;
+      margin-bottom: 24px;
+    }
+
+    .hero-badge i {
+      width: 16px;
+      height: 16px;
+      color: #c084fc;
+    }
+
+    .hero h1 {
+      font-size: 56px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      line-height: 1.15;
+      margin-bottom: 24px;
+      background: linear-gradient(180deg, #ffffff 30%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: 20px;
+      color: var(--text-muted);
+      max-width: 720px;
+      margin: 0 auto 36px;
+      font-weight: 400;
+    }
+
+    .hero-cta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn-hero-primary {
+      background: linear-gradient(135deg, #9333ea, #7c3aed);
+      color: #fff;
+      padding: 16px 36px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-size: 17px;
+      font-weight: 700;
+      box-shadow: 0 8px 30px rgba(147, 51, 234, 0.5);
+      transition: transform 0.2s, box-shadow 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-hero-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(147, 51, 234, 0.7);
+    }
+
+    .btn-hero-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      padding: 16px 28px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .btn-hero-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--purple);
+    }
+
+    .hero-meta {
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* APP PREVIEW CARD */
+    .app-preview {
+      margin: 50px auto 100px;
+      max-width: 1060px;
+      background: #0d0918;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 16px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), 0 0 50px rgba(168, 85, 247, 0.15);
+      overflow: hidden;
+    }
+
+    .preview-header {
+      background: #140d25;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+    }
+
+    .preview-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .preview-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .preview-dot.red { background: #ff5f56; }
+    .preview-dot.yellow { background: #ffbd2e; }
+    .preview-dot.green { background: #27c93f; }
+
+    .preview-title {
+      font-family: 'Fira Code', monospace;
+      font-size: 13px;
+      color: #d8b4fe;
+      margin-left: 12px;
+    }
+
+    .preview-body {
+      padding: 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .mockup-card {
+      background: rgba(24, 15, 43, 0.7);
+      border: 1px solid rgba(168, 85, 247, 0.25);
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .mockup-card h3 {
+      font-size: 16px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #fff;
+    }
+
+    .mockup-card p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* FEATURES GRID */
+    .features-section {
+      padding: 40px 0 100px;
+    }
+
+    .section-title {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .section-title h2 {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 14px;
+    }
+
+    .section-title p {
+      font-size: 17px;
+      color: var(--text-muted);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 32px 28px;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+      backdrop-filter: blur(8px);
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--card-hover);
+      box-shadow: 0 16px 36px rgba(168, 85, 247, 0.15);
+    }
+
+    .feature-icon-box {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(99, 102, 241, 0.2));
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      color: #d8b4fe;
+    }
+
+    .feature-card h3 {
+      font-size: 19px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #fff;
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* FOOTER */
+    .footer {
+      border-top: 1px solid rgba(168, 85, 247, 0.15);
+      padding: 40px 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .footer a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+
+    @media (max-width: 900px) {
+      .features-grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 38px; }
+      .preview-body { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-glow-1"></div>
+  <div class="bg-glow-2"></div>
+
+  <div class="container">
+    
+    <!-- NAVBAR -->
+    <header class="navbar">
+      <a href="#" class="brand">
+        <img src="logo.png" alt="FYXXSSH Logo">
+        <span>FYXX<strong>SSH</strong></span>
+      </a>
+      <nav class="nav-links">
+        <a href="#recursos" class="nav-link">Recursos</a>
+        <a href="https://github.com/ogerrva/fyxxssh" class="nav-link" target="_blank">GitHub</a>
+        <a href="https://github.com/ogerrva/fyxxssh/releases/latest" class="btn-nav-download" target="_blank">
+          <i data-lucide="download"></i>
+          <span>Baixar .EXE</span>
+        </a>
+      </nav>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-badge">
+        <i data-lucide="sparkles"></i>
+        <span>Lançamento Oficial v1.0.0 para Windows 64-bit</span>
+      </div>
+
+      <h1>O Cliente SSH & SFTP Definitivo<br>com Atalhos de Pastas Remotas</h1>
+
+      <p>
+        Abra tanto o terminal interativo quanto o explorador de arquivos SFTP 
+        diretamente na pasta do seu projeto em 1 clique. Rápido, moderno e sem burocracia.
+      </p>
+
+      <div class="hero-cta">
+        <a href="https://github.com/ogerrva/fyxxssh/releases/download/v1.0.0/FYXXSSH-Setup-v1.0.0.exe" class="btn-hero-primary">
+          <i data-lucide="download"></i>
+          <span>Baixar Instalador (Setup v1.0.0)</span>
+        </a>
+        <a href="https://github.com/ogerrva/fyxxssh" class="btn-hero-secondary" target="_blank">
+          <i data-lucide="github"></i>
+          <span>Ver no GitHub</span>
+        </a>
+      </div>
+
+      <div class="hero-meta">
+        ✔ Windows 10/11 x64 &nbsp;•&nbsp; ✔ Instalador Oficial Seguro &nbsp;•&nbsp; ✔ 100% Gratuito e Código Aberto
+      </div>
+    </section>
+
+    <!-- APP PREVIEW -->
+    <div class="app-preview">
+      <div class="preview-header">
+        <div class="preview-dots">
+          <div class="preview-dot red"></div>
+          <div class="preview-dot yellow"></div>
+          <div class="preview-dot green"></div>
+        </div>
+        <div class="preview-title">root@fyxx-vps:/opt/fyxxdrops-web# — FYXXSSH Studio</div>
+      </div>
+      <div class="preview-body">
+        <div class="mockup-card">
+          <h3><i data-lucide="folder-symlink" style="color:#a855f7;"></i> Atalhos Diretos de Pastas</h3>
+          <p>Esqueça ter que abrir em /root/ e dar <code>cd /opt/app</code> toda vez. Salve atalhos e acerte o diretório na hora.</p>
+        </div>
+        <div class="mockup-card">
+          <h3><i data-lucide="terminal" style="color:#00e5ff;"></i> Terminal + SFTP Lado a Lado</h3>
+          <p>Edite arquivos, faça uploads com arrastar e soltar e rode comandos simultaneamente com divisão em tempo real.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <section class="features-section" id="recursos">
+      <div class="section-title">
+        <h2>Por que o FYXXSSH é Diferente?</h2>
+        <p>Projetado do zero para desenvolvedores, sysadmins e operadores de VPS</p>
+      </div>
+
+      <div class="features-grid">
+        
+        <div class="feature-card">
+          <div class="feature-icon-box">
+            <i data-lucide="folder-tree"></i>
+          </div>
+          <h3>Atalhos de Diretórios na Home</h3>
+          <p>Cadastre atalhos para suas aplicações remotas (ex: <code>/opt/fyxxdrops-web/</code>). Ao conectar, o Terminal e o SFTP já abrem na pasta certa.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">
+            <i data-lucide="mouse-pointer-click"></i>
+          </div>
+          <h3>Drag & Drop Bidirecional</h3>
+          <p>Arraste arquivos da Área de Trabalho do Windows para o servidor, e do servidor de volta para o Windows nativamente.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">
+            <i data-lucide="zap"></i>
+          </div>
+          <h3>Máxima Velocidade de Criptografia</h3>
+          <p>Otimizado com os ciphers OpenSSH modernos mais velozes (ChaCha20-Poly1305 e AES-128-GCM) para taxas ultra-rápidas.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">
+            <i data-lucide="files"></i>
+          </div>
+          <h3>Gestão Inteligente de Conflitos</h3>
+          <p>Ao transferir arquivos duplicados, escolha substituir, renomear ou pular com a opção de "Aplicar para todos os arquivos".</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">
+            <i data-lucide="activity"></i>
+          </div>
+          <h3>Telemetria VPS em Tempo Real</h3>
+          <p>Monitore o consumo de CPU, Memória RAM, Uso de Disco e Tempo de Atividade (Uptime) do servidor em uma barra discreta.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">
+            <i data-lucide="palette"></i>
+          </div>
+          <h3>Layouts & Temas Customizáveis</h3>
+          <p>Alterne entre modo Split Vertical, Horizontal, Foco em Terminal ou Foco em Arquivos, com temas Obsidian, Cyberpunk e Dracula.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <p>© 2026 <strong>FYXXSSH</strong>. Criado com paixão por <a href="https://github.com/ogerrva" target="_blank">ogerrva</a>. Licença MIT.</p>
+    </footer>
+
+  </div>
+
+  <script>
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+  </script>
+</body>
+</html>

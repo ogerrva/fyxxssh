@@ -1496,48 +1496,252 @@ code, pre, .mono {
   cursor: pointer;
 }
 
-/* TELEMETRIA */
-.telemetry-bar {
-  height: 28px;
-  background-color: var(--bg-sidebar);
-  border-bottom: 1px solid var(--border-subtle);
+/* ================= BARRA DE ABAS DE SESSÃO MULTI-CONEXÕES ================= */
+.session-tabs-header {
   display: flex;
   align-items: center;
-  padding: 0 16px;
-  gap: 16px;
-  font-size: 11px;
+  justify-content: space-between;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-color);
+  padding: 4px 10px 0 10px;
+  min-height: 38px;
+  user-select: none;
+  flex-shrink: 0;
+  gap: 8px;
 }
 
-.telemetry-item {
+.session-tabs-list {
   display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  overflow-x: auto;
+  flex: 1;
+  scrollbar-width: none;
+}
+.session-tabs-list::-webkit-scrollbar {
+  display: none;
+}
+
+.session-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.session-tab-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}
+
+.session-tab-item.active {
+  background: var(--bg-main);
+  color: var(--accent-primary);
+  border-color: rgba(168, 85, 247, 0.4);
+  font-weight: 600;
+  border-top: 2px solid var(--accent-primary);
+}
+
+.session-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  box-shadow: 0 0 6px var(--accent-green);
+  flex-shrink: 0;
+}
+
+.session-tab-title {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.session-tab-close:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.btn-new-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: #d8b4fe;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  margin-bottom: 3px;
+}
+
+.btn-new-tab:hover {
+  background: rgba(168, 85, 247, 0.25);
+  border-color: var(--accent-primary);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.session-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border-subtle);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.session-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ================= TELEMETRIA VPS DISCRETA & HORIZONTAL ================= */
+.vps-telemetry-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  transition: all 0.2s ease;
+}
+
+.vps-telemetry-bar.hidden {
+  display: none !important;
+}
+
+.telemetry-pill {
+  display: inline-flex;
   align-items: center;
   gap: 5px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: 'Fira Code', monospace;
 }
 
-.telemetry-icon {
+.telemetry-pill i {
   width: 12px;
   height: 12px;
   color: var(--accent-primary);
 }
 
-.telemetry-label {
-  color: var(--text-muted);
-}
-
-.telemetry-value {
+.telemetry-pill .telemetry-value {
   color: #fff;
-  font-family: 'Fira Code', monospace;
   font-weight: 600;
 }
 
-.telemetry-refresh-btn {
-  margin-left: auto;
-  background: none;
+.telemetry-btn-mini {
+  background: transparent;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 2px;
   display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.telemetry-btn-mini:hover {
+  color: var(--accent-primary);
+}
+
+.btn-telemetry-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-telemetry-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.btn-telemetry-toggle.active {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  background: rgba(168, 85, 247, 0.12);
+}
+
+/* ================= REVELAÇÃO DE SENHA (OLHO) ================= */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrapper input {
+  width: 100%;
+  padding-right: 36px !important;
+}
+
+.btn-toggle-password {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.btn-toggle-password:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn-toggle-password i {
+  width: 16px;
+  height: 16px;
+}
   align-items: center;
 }
 
@@ -1711,10 +1915,46 @@ code, pre, .mono {
 
 .xterm-container {
   flex: 1;
-  background-color: #05070a;
-  padding: 6px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  background-color: #070a0f;
+  padding: 4px;
   overflow: hidden;
+  position: relative;
   cursor: text;
+}
+
+.tab-xterm-instance {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-xterm-instance.hidden {
+  display: none !important;
+}
+
+.xterm {
+  height: 100% !important;
+  width: 100% !important;
+  padding: 2px 4px;
+}
+
+.xterm .xterm-viewport {
+  background-color: transparent !important;
+  overflow-y: auto !important;
+}
+
+.xterm .xterm-screen {
+  width: 100% !important;
 }
 
 /* SFTP HEADER */

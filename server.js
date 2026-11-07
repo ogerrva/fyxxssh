@@ -605,7 +605,7 @@ app.post('/api/vps-stats', (req, res) => {
   }, 7000);
 
   conn.on('ready', () => {
-    const cmd = `echo "CPU:$(top -bn1 | grep 'Cpu(s)' | awk '{print $2}')%|RAM:$(free -m | awk '/Mem:/ {printf \\"%d/%dMB (%.1f%%)\\", $3, $2, $3*100/$2}')|DISK:$(df -h / | awk 'NR==2 {print $3\\"/\\"$2\\" (\\"$5\\")\\"}')|UPTIME:$(uptime -p 2>/dev/null || uptime | awk -F',' '{print $1}')"`;
+    const cmd = `echo "CPU:$(top -bn1 | grep -i 'Cpu(s)' | awk '{print $2+$4}')%|RAM:$(free -m | awk 'NR==2{printf \\"%.1f/%.1f GB\\", $3/1024, $2/1024}')|DISK:$(df -h / | awk 'END{print $3 \\"/\\" $2}')|UPTIME:$(uptime -p 2>/dev/null || uptime | awk -F',' '{print $1}')"`;
 
     conn.exec(cmd, (err, stream) => {
       if (err) {
@@ -655,6 +655,13 @@ app.post('/api/vps-stats', (req, res) => {
       res.status(500).json({ error: err.message });
     }
   }
+});
+
+// Suporte GET para telemetria
+app.get(['/api/stats', '/api/vps-stats'], (req, res) => {
+  const hostId = req.query.hostId;
+  req.body = { hostId };
+  app._router.handle({ ...req, method: 'POST', url: '/api/vps-stats' }, res);
 });
 
 // =================== TESTE DE CONEXÃO ===================
@@ -1118,7 +1125,10 @@ wss.on('connection', (ws) => {
       const msg = JSON.parse(message);
 
       if (msg.type === 'init') {
-        const { hostId, initialPath, cols, rows } = msg;
+        const hostId = msg.hostId;
+        const initialTargetDir = msg.initialDir || msg.initialPath || '';
+        const cols = parseInt(msg.cols, 10) || 80;
+        const rows = parseInt(msg.rows, 10) || 24;
         const data = loadStorage();
         const host = data.hosts.find(h => h.id === hostId);
 
@@ -1130,15 +1140,15 @@ wss.on('connection', (ws) => {
         sshClient = new Client();
 
         sshClient.on('ready', () => {
-          ws.send(JSON.stringify({ type: 'status', data: '✔ Conectado ao servidor! Inicializando PTY...\r\n' }));
+          ws.send(JSON.stringify({ type: 'status', data: '✔ Conexão estabelecida com sucesso!\r\n' }));
 
           sshClient.shell({
             term: 'xterm-256color',
-            cols: cols || 90,
-            rows: rows || 28
+            cols: cols,
+            rows: rows
           }, (err, stream) => {
             if (err) {
-              ws.send(JSON.stringify({ type: 'error', data: `Erro ao iniciar shell: ${err.message}\r\n` }));
+              ws.send(JSON.stringify({ type: 'error', data: `Erro ao iniciar shell interativo: ${err.message}\r\n` }));
               return ws.close();
             }
 
@@ -1147,11 +1157,13 @@ wss.on('connection', (ws) => {
             // Injeção garantida do diretório remoto
             const executeDirectoryChange = () => {
               if (hasNavigated) return;
-              if (initialPath && initialPath.trim().length > 0 && initialPath.trim() !== '/' && initialPath.trim() !== '/root') {
+              if (initialTargetDir && initialTargetDir.trim().length > 0 && initialTargetDir.trim() !== '/' && initialTargetDir.trim() !== '/root') {
                 hasNavigated = true;
-                const targetDir = initialPath.trim();
+                const targetDir = initialTargetDir.trim();
                 setTimeout(() => {
-                  stream.write(`cd "${targetDir}" && clear\n`);
+                  try {
+                    stream.write(`cd "${targetDir}" && clear\n`);
+                  } catch (e) {}
                 }, 150);
               }
             };
@@ -1171,7 +1183,7 @@ wss.on('connection', (ws) => {
 
             setTimeout(() => {
               executeDirectoryChange();
-            }, 600);
+            }, 500);
           });
         });
 
@@ -1184,17 +1196,25 @@ wss.on('connection', (ws) => {
         });
 
         sshClient.connect(getSSHConfig(host));
-      } else if (msg.type === 'data') {
-        if (sshStream) {
-          sshStream.write(msg.data);
+      } else if (msg.type === 'data' || msg.type === 'input') {
+        if (sshStream && msg.data !== undefined) {
+          try {
+            sshStream.write(msg.data);
+          } catch(e) {
+            console.error('Erro ao escrever no sshStream:', e);
+          }
         }
       } else if (msg.type === 'command') {
         if (sshStream && msg.command) {
-          sshStream.write(msg.command + '\n');
+          try {
+            sshStream.write(msg.command + '\n');
+          } catch(e) {}
         }
       } else if (msg.type === 'resize') {
         if (sshStream && msg.cols && msg.rows) {
-          sshStream.setWindow(msg.rows, msg.cols, 0, 0);
+          try {
+            sshStream.setWindow(parseInt(msg.rows, 10), parseInt(msg.cols, 10), 0, 0);
+          } catch(e) {}
         }
       }
     } catch (e) {

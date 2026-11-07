@@ -136,40 +136,16 @@ function applyTheme(themeName, persist = true) {
     showToast(`Tema ativado: ${themeName.toUpperCase()}`, 'success');
   }
 
-  if (xtermInstance) {
-    updateXtermTheme(themeName);
-  }
+  updateXtermTheme(themeName);
 }
 
 function updateXtermTheme(themeName) {
-  if (!xtermInstance) return;
-  let bg = '#070a0f';
-  let cursor = '#00e5ff';
-
-  if (themeName === 'cyberpunk') {
-    bg = '#0d0b18';
-    cursor = '#f43f5e';
-  } else if (themeName === 'dracula') {
-    bg = '#1e1f29';
-    cursor = '#bd93f9';
-  } else if (themeName === 'nordic') {
-    bg = '#181e28';
-    cursor = '#88c0d0';
-  }
-
-  xtermInstance.options.theme = {
-    background: bg,
-    foreground: '#e6edf3',
-    cursor: cursor,
-    black: '#1f242c',
-    red: '#ff5c57',
-    green: '#5af78e',
-    yellow: '#f3f99d',
-    blue: '#57c7ff',
-    magenta: '#ff6ac1',
-    cyan: '#9aedfe',
-    white: '#f1f1f0'
-  };
+  const themeObj = getXtermThemeObject(themeName);
+  sessionTabs.forEach(tab => {
+    if (tab.xterm) {
+      tab.xterm.options.theme = themeObj;
+    }
+  });
 }
 
 function setSessionLayout(layoutName, persist = true) {
@@ -512,7 +488,46 @@ function renderShortcutsGrid() {
   if (window.lucide) lucide.createIcons();
 }
 
-// =================== SESSÃO SSH ATIVA ===================
+// =================== SESSÕES SSH E SISTEMA MULTI-ABAS ===================
+let sessionTabs = []; // Array de abas ativas: [{ id, hostId, hostName, title, initialDir, currentSftpPath, xterm, fitAddon, searchAddon, socket, containerEl }]
+let activeTabId = null;
+let telemetryVisible = true;
+let sessionResizeObserver = null;
+
+function getActiveTab() {
+  return sessionTabs.find(t => t.id === activeTabId) || (sessionTabs.length > 0 ? sessionTabs[0] : null);
+}
+
+function getXtermThemeObject(themeName) {
+  let bg = '#070a0f';
+  let cursor = '#00e5ff';
+
+  if (themeName === 'cyberpunk') {
+    bg = '#0d0b18';
+    cursor = '#f43f5e';
+  } else if (themeName === 'dracula') {
+    bg = '#1e1f29';
+    cursor = '#bd93f9';
+  } else if (themeName === 'nordic') {
+    bg = '#181e28';
+    cursor = '#88c0d0';
+  }
+
+  return {
+    background: bg,
+    foreground: '#e6edf3',
+    cursor: cursor,
+    black: '#1f242c',
+    red: '#ff5c57',
+    green: '#5af78e',
+    yellow: '#f3f99d',
+    blue: '#57c7ff',
+    magenta: '#ff6ac1',
+    cyan: '#9aedfe',
+    white: '#f1f1f0'
+  };
+}
+
 async function openSession(hostId, targetPath = '/root', preferredLayout = 'split-vertical', shortcutId = null) {
   const host = hosts.find(h => h.id === hostId);
   if (!host) {
@@ -522,6 +537,63 @@ async function openSession(hostId, targetPath = '/root', preferredLayout = 'spli
 
   showToast(`Conectando com alta performance a ${host.name}...`, 'info');
 
+  const tabId = 'tab_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+  const countSameHost = sessionTabs.filter(t => t.hostId === hostId).length + 1;
+  const tabTitle = `${host.name} #${countSameHost}`;
+
+  // Cria elemento container dedicado no DOM para este xterm
+  const mainContainer = document.getElementById('xtermContainer');
+  const tabContainer = document.createElement('div');
+  tabContainer.className = 'tab-xterm-instance';
+  tabContainer.id = `xterm_instance_${tabId}`;
+  mainContainer.appendChild(tabContainer);
+
+  // Instancia terminal xterm
+  const xterm = new Terminal({
+    theme: getXtermThemeObject(userSettings.theme || 'obsidian'),
+    fontSize: 13,
+    fontFamily: "'Fira Code', 'Courier New', monospace",
+    cursorBlink: true,
+    cursorStyle: 'bar',
+    convertEol: true
+  });
+
+  const fit = new FitAddon.FitAddon();
+  xterm.loadAddon(fit);
+
+  let search = null;
+  if (window.SearchAddon) {
+    search = new SearchAddon.SearchAddon();
+    xterm.loadAddon(search);
+  }
+
+  if (window.WebLinksAddon) {
+    xterm.loadAddon(new WebLinksAddon.WebLinksAddon());
+  }
+
+  xterm.open(tabContainer);
+
+  // Conexão WebSocket com o PTY SSH remoto
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/ws/terminal`;
+  const socket = new WebSocket(wsUrl);
+
+  const newTab = {
+    id: tabId,
+    hostId: host.id,
+    hostName: host.name,
+    title: tabTitle,
+    initialDir: targetPath || '/root',
+    currentSftpPath: targetPath || '/root',
+    shortcutId: shortcutId,
+    xterm: xterm,
+    fitAddon: fit,
+    searchAddon: search,
+    socket: socket,
+    containerEl: tabContainer
+  };
+
+  sessionTabs.push(newTab);
   activeSession = {
     hostId: host.id,
     hostName: host.name,
@@ -529,14 +601,80 @@ async function openSession(hostId, targetPath = '/root', preferredLayout = 'spli
     shortcutId: shortcutId
   };
 
-  // Reseta histórico de navegação para a sessão
+  // Teclado PRO: atalhos de cópia/colagem/busca
+  xterm.attachCustomKeyEventHandler((e) => {
+    if (e.type === 'keydown') {
+      if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+        const selection = xterm.getSelection();
+        if (selection && selection.length > 0) {
+          navigator.clipboard.writeText(selection);
+          showToast('Texto copiado!', 'info');
+          return false;
+        }
+      }
+      if (e.ctrlKey && e.key.toLowerCase() === 'v') {
+        pasteToTerminal();
+        return false;
+      }
+      if (e.ctrlKey && e.key.toLowerCase() === 'f') {
+        toggleTermSearch();
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // TECLADO EM TEMPO REAL: envia caracteres digitados diretamente ao shell PTY!
+  xterm.onData((data) => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'input', data }));
+    }
+  });
+
+  xterm.onResize(({ cols, rows }) => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'resize', cols, rows }));
+    }
+  });
+
+  socket.onopen = () => {
+    try { fit.fit(); } catch(e) {}
+    socket.send(JSON.stringify({
+      type: 'init',
+      hostId: host.id,
+      initialDir: targetPath || '/root',
+      cols: xterm.cols || 80,
+      rows: xterm.rows || 24
+    }));
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'output' || msg.type === 'status') {
+        xterm.write(msg.data);
+      } else if (msg.type === 'error') {
+        xterm.writeln(`\r\n\x1b[31m[FYXXSSH Erro] ${msg.message || msg.data}\x1b[0m\r\n`);
+      }
+    } catch (e) {
+      xterm.write(event.data);
+    }
+  };
+
+  socket.onclose = () => {
+    xterm.writeln('\r\n\x1b[33m[Conexão finalizada pelo servidor]\x1b[0m\r\n');
+  };
+
+  // Ativa a nova aba
+  switchSessionTab(tabId);
+
+  // Configura a visualização
   currentSftpPath = targetPath || '/root';
   sftpHistory = [currentSftpPath];
   sftpHistoryIndex = 0;
   updateSftpNavButtons();
 
-  document.getElementById('sessionHostTitle').textContent = host.name;
-  document.getElementById('sessionPathBadge').textContent = currentSftpPath;
+  document.getElementById('navSessionBtn').style.display = 'flex';
   document.getElementById('globalStatusText').textContent = `Conectado: ${host.name}`;
   document.getElementById('globalStatusTag').classList.add('online');
 
@@ -544,18 +682,209 @@ async function openSession(hostId, targetPath = '/root', preferredLayout = 'spli
   setSessionLayout(preferredLayout || userSettings.layout || 'split-vertical', false);
   switchMainView('session');
 
-  // Inicializa Terminal e SFTP
-  initTerminal(hostId, targetPath);
+  // Carrega SFTP
   loadSftpDirectory(hostId, targetPath, false);
 
+  // Telemetria e ResizeObserver
   startTelemetryTimer();
+  setupTerminalResizeObserver();
+}
+
+function openNewSessionTab() {
+  const current = getActiveTab();
+  if (current) {
+    openSession(current.hostId, current.currentSftpPath || current.initialDir || '/root', userSettings.layout || 'split-vertical');
+  } else if (hosts.length > 0) {
+    openSession(hosts[0].id, '/root', userSettings.layout || 'split-vertical');
+  } else {
+    showToast('Cadastre um servidor SSH primeiro', 'info');
+  }
+}
+
+function switchSessionTab(tabId) {
+  const targetTab = sessionTabs.find(t => t.id === tabId);
+  if (!targetTab) return;
+
+  activeTabId = tabId;
+  activeSession = {
+    hostId: targetTab.hostId,
+    hostName: targetTab.hostName,
+    targetPath: targetTab.currentSftpPath || targetTab.initialDir || '/root',
+    shortcutId: targetTab.shortcutId
+  };
+
+  // Mostra apenas a aba ativa
+  sessionTabs.forEach(t => {
+    if (t.id === tabId) {
+      t.containerEl.classList.remove('hidden');
+    } else {
+      t.containerEl.classList.add('hidden');
+    }
+  });
+
+  renderSessionTabsList();
+
+  // Atualiza cabeçalhos
+  document.getElementById('sessionHostTitle').textContent = targetTab.hostName;
+  document.getElementById('sessionPathBadge').textContent = targetTab.currentSftpPath || '/root';
+  document.getElementById('globalStatusText').textContent = `Conectado: ${targetTab.hostName}`;
+
+  // Atualiza SFTP view
+  currentSftpPath = targetTab.currentSftpPath || '/root';
+  loadSftpDirectory(targetTab.hostId, currentSftpPath, false);
+
+  // Redimensionamento e foco imediato no terminal
+  setTimeout(() => {
+    try {
+      targetTab.fitAddon.fit();
+      if (targetTab.socket && targetTab.socket.readyState === WebSocket.OPEN) {
+        targetTab.socket.send(JSON.stringify({
+          type: 'resize',
+          cols: targetTab.xterm.cols,
+          rows: targetTab.xterm.rows
+        }));
+      }
+    } catch(e) {}
+    targetTab.xterm.focus();
+  }, 40);
+}
+
+function renderSessionTabsList() {
+  const listEl = document.getElementById('sessionTabsList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+
+  sessionTabs.forEach(tab => {
+    const item = document.createElement('div');
+    item.className = `session-tab-item ${tab.id === activeTabId ? 'active' : ''}`;
+    item.onclick = (e) => {
+      if (e.target.closest('.session-tab-close')) return;
+      switchSessionTab(tab.id);
+    };
+
+    item.innerHTML = `
+      <span class="session-tab-dot"></span>
+      <span class="session-tab-title" title="${escapeHtml(tab.title)}">${escapeHtml(tab.title)}</span>
+      <span class="session-tab-close" onclick="closeActiveTab('${tab.id}', event)" title="Fechar Aba">&times;</span>
+    `;
+
+    listEl.appendChild(item);
+  });
+}
+
+function closeActiveTab(tabIdToClose = null, event = null) {
+  if (event) event.stopPropagation();
+
+  const id = tabIdToClose || activeTabId;
+  const tabIndex = sessionTabs.findIndex(t => t.id === id);
+  if (tabIndex === -1) return;
+
+  const tab = sessionTabs[tabIndex];
+
+  try {
+    if (tab.socket) tab.socket.close();
+    if (tab.xterm) tab.xterm.dispose();
+    if (tab.containerEl) tab.containerEl.remove();
+  } catch(e) {}
+
+  sessionTabs.splice(tabIndex, 1);
+
+  if (sessionTabs.length > 0) {
+    const nextTab = sessionTabs[Math.max(0, tabIndex - 1)];
+    switchSessionTab(nextTab.id);
+  } else {
+    closeActiveSession();
+  }
+}
+
+function closeActiveSession() {
+  if (telemetryTimer) {
+    clearInterval(telemetryTimer);
+    telemetryTimer = null;
+  }
+
+  sessionTabs.forEach(tab => {
+    try {
+      if (tab.socket) tab.socket.close();
+      if (tab.xterm) tab.xterm.dispose();
+      if (tab.containerEl) tab.containerEl.remove();
+    } catch(e) {}
+  });
+
+  sessionTabs = [];
+  activeTabId = null;
+
+  document.getElementById('navSessionBtn').style.display = 'none';
+  document.getElementById('globalStatusText').textContent = 'Desconectado';
+  document.getElementById('globalStatusTag').classList.remove('online');
+  switchMainView('home');
+  showToast('Sessão encerrada.', 'info');
+}
+
+function setupTerminalResizeObserver() {
+  const container = document.getElementById('xtermContainer');
+  if (!container || sessionResizeObserver) return;
+
+  sessionResizeObserver = new ResizeObserver(() => {
+    handleWindowResize();
+  });
+  sessionResizeObserver.observe(container);
+}
+
+function handleWindowResize() {
+  const tab = getActiveTab();
+  if (tab && tab.fitAddon) {
+    try {
+      tab.fitAddon.fit();
+      if (tab.xterm && tab.socket && tab.socket.readyState === WebSocket.OPEN) {
+        tab.socket.send(JSON.stringify({
+          type: 'resize',
+          cols: tab.xterm.cols,
+          rows: tab.xterm.rows
+        }));
+      }
+    } catch(e) {}
+  }
+}
+
+// =================== TELEMETRIA DISCRETA & REVELAR SENHA ===================
+function toggleTelemetryVisibility() {
+  const bar = document.getElementById('vpsTelemetryBar');
+  const btn = document.getElementById('btnTelemetryToggle');
+  if (!bar) return;
+
+  telemetryVisible = !telemetryVisible;
+  if (telemetryVisible) {
+    bar.classList.remove('hidden');
+    if (btn) btn.classList.add('active');
+  } else {
+    bar.classList.add('hidden');
+    if (btn) btn.classList.remove('active');
+  }
+}
+
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.innerHTML = '<i data-lucide="eye-off"></i>';
+    btn.title = 'Ocultar Senha';
+  } else {
+    input.type = 'password';
+    btn.innerHTML = '<i data-lucide="eye"></i>';
+    btn.title = 'Revelar Senha';
+  }
+  if (window.lucide) lucide.createIcons();
 }
 
 function openSessionAndRunSnippet(hostId, path, command) {
   openSession(hostId, path, 'terminal-focus').then(() => {
     setTimeout(() => {
-      if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
-        terminalSocket.send(JSON.stringify({ type: 'input', data: command + '\n' }));
+      const tab = getActiveTab();
+      if (tab && tab.socket && tab.socket.readyState === WebSocket.OPEN) {
+        tab.socket.send(JSON.stringify({ type: 'input', data: command + '\n' }));
       }
     }, 1200);
   });
@@ -583,8 +912,9 @@ function renderSessionSnippets(shortcutId) {
     chip.className = 'snippet-chip';
     chip.innerHTML = `<i data-lucide="play"></i> <span>${escapeHtml(snp.label)}</span>`;
     chip.onclick = () => {
-      if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
-        terminalSocket.send(JSON.stringify({ type: 'input', data: snp.command + '\n' }));
+      const tab = getActiveTab();
+      if (tab && tab.socket && tab.socket.readyState === WebSocket.OPEN) {
+        tab.socket.send(JSON.stringify({ type: 'input', data: snp.command + '\n' }));
         showToast(`Executado: ${snp.label}`, 'success');
       }
     };
@@ -594,172 +924,33 @@ function renderSessionSnippets(shortcutId) {
   if (window.lucide) lucide.createIcons();
 }
 
-function closeActiveSession() {
-  if (telemetryTimer) {
-    clearInterval(telemetryTimer);
-    telemetryTimer = null;
-  }
-
-  if (terminalSocket) {
-    terminalSocket.close();
-    terminalSocket = null;
-  }
-
-  if (xtermInstance) {
-    xtermInstance.dispose();
-    xtermInstance = null;
-    fitAddon = null;
-    searchAddon = null;
-  }
-
-  activeSession = null;
-  document.getElementById('navSessionBtn').style.display = 'none';
-  document.getElementById('globalStatusText').textContent = 'Desconectado';
-  document.getElementById('globalStatusTag').classList.remove('online');
-  switchMainView('home');
-  showToast('Sessão encerrada com sucesso.', 'info');
-}
-
-// =================== XTERM.JS ENGINE COM ATALHOS PRO ===================
-function initTerminal(hostId, initialDir) {
-  const container = document.getElementById('xtermContainer');
-  container.innerHTML = '';
-
-  if (xtermInstance) {
-    xtermInstance.dispose();
-  }
-
-  xtermInstance = new Terminal({
-    theme: {
-      background: '#070a0f',
-      foreground: '#e6edf3',
-      cursor: '#00e5ff',
-      black: '#1f242c',
-      red: '#ff5c57',
-      green: '#5af78e',
-      yellow: '#f3f99d',
-      blue: '#57c7ff',
-      magenta: '#ff6ac1',
-      cyan: '#9aedfe',
-      white: '#f1f1f0'
-    },
-    fontSize: 13,
-    fontFamily: "'Fira Code', 'Courier New', monospace",
-    cursorBlink: true,
-    cursorStyle: 'bar',
-    convertEol: true
-  });
-
-  fitAddon = new FitAddon.FitAddon();
-  xtermInstance.loadAddon(fitAddon);
-
-  if (window.SearchAddon) {
-    searchAddon = new SearchAddon.SearchAddon();
-    xtermInstance.loadAddon(searchAddon);
-  }
-
-  if (window.WebLinksAddon) {
-    xtermInstance.loadAddon(new WebLinksAddon.WebLinksAddon());
-  }
-
-  xtermInstance.open(container);
-  fitAddon.fit();
-  updateXtermTheme(userSettings.theme || 'obsidian');
-
-  // SUPORTE TOTAL A ATALHOS: Ctrl+C INTELIGENTE, Ctrl+V, etc.
-  xtermInstance.attachCustomKeyEventHandler((e) => {
-    if (e.type === 'keydown') {
-      // Ctrl+C: se houver seleção, copia texto; caso contrário envia SIGINT ao shell
-      if (e.ctrlKey && e.key.toLowerCase() === 'c') {
-        const selection = xtermInstance.getSelection();
-        if (selection && selection.length > 0) {
-          navigator.clipboard.writeText(selection);
-          showToast('Texto copiado!', 'info');
-          return false;
-        }
-      }
-      // Ctrl+V: colar direto do clipboard
-      if (e.ctrlKey && e.key.toLowerCase() === 'v') {
-        pasteToTerminal();
-        return false;
-      }
-      // Ctrl+F: abrir barra de busca do terminal
-      if (e.ctrlKey && e.key.toLowerCase() === 'f') {
-        toggleTermSearch();
-        return false;
-      }
-    }
-    return true;
-  });
-
-  // Conexão WebSocket
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}/ws/terminal`;
-  terminalSocket = new WebSocket(wsUrl);
-
-  terminalSocket.onopen = () => {
-    terminalSocket.send(JSON.stringify({
-      type: 'init',
-      hostId: hostId,
-      initialDir: initialDir,
-      cols: xtermInstance.cols,
-      rows: xtermInstance.rows
-    }));
-  };
-
-  terminalSocket.onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data);
-      if (msg.type === 'output') {
-        xtermInstance.write(msg.data);
-      } else if (msg.type === 'error') {
-        xtermInstance.writeln(`\r\n\x1b[31m[FYXXSSH Erro] ${msg.message}\x1b[0m\r\n`);
-      }
-    } catch (e) {
-      xtermInstance.write(event.data);
-    }
-  };
-
-  terminalSocket.onclose = () => {
-    if (xtermInstance) {
-      xtermInstance.writeln('\r\n\x1b[33m[Conexão SSH finalizada]\x1b[0m\r\n');
-    }
-  };
-
-  xtermInstance.onData((data) => {
-    if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
-      terminalSocket.send(JSON.stringify({ type: 'input', data }));
-    }
-  });
-
-  xtermInstance.onResize(({ cols, rows }) => {
-    if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
-      terminalSocket.send(JSON.stringify({ type: 'resize', cols, rows }));
-    }
-  });
-}
-
-function handleWindowResize() {
-  if (fitAddon) {
-    try { fitAddon.fit(); } catch (e) {}
-  }
-}
-
 // =================== CLIPBOARD & TERMINAL CONTEXT MENU ===================
 async function pasteToTerminal() {
   try {
     const text = await navigator.clipboard.readText();
-    if (text && terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
-      terminalSocket.send(JSON.stringify({ type: 'input', data: text }));
+    const tab = getActiveTab();
+    if (text && tab && tab.socket && tab.socket.readyState === WebSocket.OPEN) {
+      tab.socket.send(JSON.stringify({ type: 'input', data: text }));
     }
   } catch (err) {
-    showToast('Não foi possível ler da área de transferência', 'error');
+    showToast('Erro ao acessar área de transferência: ' + err.message, 'error');
+  }
+}
+
+function clearActiveTerminal() {
+  const tab = getActiveTab();
+  if (tab && tab.xterm) {
+    tab.xterm.clear();
+    if (tab.socket && tab.socket.readyState === WebSocket.OPEN) {
+      tab.socket.send(JSON.stringify({ type: 'input', data: 'clear\n' }));
+    }
   }
 }
 
 function copyTerminalSelection() {
-  if (!xtermInstance) return;
-  const selection = xtermInstance.getSelection();
+  const tab = getActiveTab();
+  if (!tab || !tab.xterm) return;
+  const selection = tab.xterm.getSelection();
   if (selection) {
     navigator.clipboard.writeText(selection);
     showToast('Texto copiado!', 'info');
@@ -768,8 +959,9 @@ function copyTerminalSelection() {
 }
 
 function selectAllTerminal() {
-  if (!xtermInstance) return;
-  xtermInstance.selectAll();
+  const tab = getActiveTab();
+  if (!tab || !tab.xterm) return;
+  tab.xterm.selectAll();
   closeTerminalContextMenu();
 }
 
@@ -808,7 +1000,8 @@ function toggleTermSearch() {
 function closeTermSearch() {
   const box = document.getElementById('terminalSearchBox');
   if (box) box.style.display = 'none';
-  if (searchAddon) searchAddon.clearDecorations();
+  const tab = getActiveTab();
+  if (tab && tab.searchAddon) tab.searchAddon.clearDecorations();
 }
 
 function handleTermSearch(e) {
@@ -821,29 +1014,42 @@ function handleTermSearch(e) {
 
 function searchTerminalNext() {
   const val = document.getElementById('termSearchInput').value;
-  if (searchAddon && val) {
-    searchAddon.findNext(val);
+  const tab = getActiveTab();
+  if (tab && tab.searchAddon && val) {
+    tab.searchAddon.findNext(val);
   }
 }
 
-// =================== TELEMETRIA VPS ===================
+// =================== TELEMETRIA VPS DISCRETA ===================
 function startTelemetryTimer() {
   if (telemetryTimer) clearInterval(telemetryTimer);
   fetchVpsStats();
-  telemetryTimer = setInterval(fetchVpsStats, 15000);
+  telemetryTimer = setInterval(fetchVpsStats, 12000);
 }
 
 async function fetchVpsStats() {
-  if (!activeSession) return;
+  const tab = getActiveTab();
+  if (!tab) return;
   try {
-    const res = await fetch(`/api/stats?hostId=${activeSession.hostId}`);
+    const res = await fetch('/api/vps-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hostId: tab.hostId })
+    });
     if (!res.ok) return;
-    const stats = await res.json();
+    const data = await res.json();
+    if (!data.success || !data.stats) return;
     
-    document.getElementById('statCpu').textContent = stats.cpu || '--%';
-    document.getElementById('statRam').textContent = stats.ram || '-- / --';
-    document.getElementById('statDisk').textContent = stats.disk || '--';
-    document.getElementById('statUptime').textContent = stats.uptime || '--';
+    const stats = data.stats;
+    const cpuEl = document.getElementById('statCpu');
+    const ramEl = document.getElementById('statRam');
+    const diskEl = document.getElementById('statDisk');
+    const uptimeEl = document.getElementById('statUptime');
+
+    if (cpuEl) cpuEl.textContent = stats.cpu || '--%';
+    if (ramEl) ramEl.textContent = stats.ram || '--/--';
+    if (diskEl) diskEl.textContent = stats.disk || '--';
+    if (uptimeEl) uptimeEl.textContent = stats.uptime || '--';
   } catch (err) {}
 }
 
@@ -1773,7 +1979,18 @@ function openHostModal() {
   document.getElementById('hostAddress').value = '';
   document.getElementById('hostPort').value = '22';
   document.getElementById('hostUser').value = 'root';
-  document.getElementById('hostPassword').value = '';
+  
+  const passInput = document.getElementById('hostPassword');
+  if (passInput) {
+    passInput.value = '';
+    passInput.type = 'password';
+  }
+  const passBtn = document.querySelector('#authPasswordGroup .btn-toggle-password');
+  if (passBtn) {
+    passBtn.innerHTML = '<i data-lucide="eye"></i>';
+    passBtn.title = 'Revelar Senha';
+  }
+
   document.getElementById('hostPrivateKey').value = '';
   document.getElementById('hostColor').value = '#3b82f6';
   document.querySelector('input[name="authType"][value="password"]').checked = true;
@@ -1793,7 +2010,18 @@ function openEditHostModal(hostId) {
   document.getElementById('hostAddress').value = host.host || '';
   document.getElementById('hostPort').value = host.port || '22';
   document.getElementById('hostUser').value = host.username || 'root';
-  document.getElementById('hostPassword').value = host.password || '';
+  
+  const passInput = document.getElementById('hostPassword');
+  if (passInput) {
+    passInput.value = host.password || '';
+    passInput.type = 'password';
+  }
+  const passBtn = document.querySelector('#authPasswordGroup .btn-toggle-password');
+  if (passBtn) {
+    passBtn.innerHTML = '<i data-lucide="eye"></i>';
+    passBtn.title = 'Revelar Senha';
+  }
+
   document.getElementById('hostPrivateKey').value = host.privateKey || '';
   document.getElementById('hostColor').value = host.color || '#3b82f6';
 

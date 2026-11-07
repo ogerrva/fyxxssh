@@ -197,6 +197,19 @@
         <!-- VIEW 2: SESSÃO ATIVA (TERMINAL / SFTP / SPLIT) -->
         <div id="sessionView" class="view-panel">
           
+          <!-- BARRA DE ABAS DE SESSÕES (MULTI-CONEXÕES NA MESMA VPS OU OUTRAS) -->
+          <div class="session-tabs-header" id="sessionTabsHeader">
+            <div class="session-tabs-list" id="sessionTabsList">
+              <!-- Abas adicionadas dinamicamente via JS -->
+            </div>
+            <div class="session-tabs-actions">
+              <button class="btn-new-tab" onclick="openNewSessionTab()" title="Abrir nova conexão / aba nesta VPS">
+                <i data-lucide="plus"></i>
+                <span>Nova Conexão</span>
+              </button>
+            </div>
+          </div>
+
           <!-- BARRA DE FERRAMENTAS DA SESSÃO -->
           <div class="session-toolbar">
             <div class="session-host-info">
@@ -209,54 +222,59 @@
               </button>
             </div>
 
-            <!-- CONTROLES DE LAYOUT -->
-            <div class="layout-switch-group">
-              <button class="layout-btn active" id="layoutSplitVBtn" onclick="setSessionLayout('split-vertical')" title="Lado a Lado (Vertical)">
-                <i data-lucide="columns-2"></i>
-              </button>
-              <button class="layout-btn" id="layoutSplitHBtn" onclick="setSessionLayout('split-horizontal')" title="Dividido Horizontalmente">
-                <i data-lucide="rows-2"></i>
-              </button>
-              <button class="layout-btn" id="layoutTermBtn" onclick="setSessionLayout('terminal-focus')" title="Foco no Terminal">
-                <i data-lucide="terminal"></i>
-              </button>
-              <button class="layout-btn" id="layoutSftpBtn" onclick="setSessionLayout('sftp-focus')" title="Foco nos Arquivos">
-                <i data-lucide="folder-tree"></i>
+            <!-- MINI TELEMETRIA VPS DISCRETA & HORIZONTAL -->
+            <div class="vps-telemetry-bar" id="vpsTelemetryBar">
+              <div class="telemetry-pill" title="Uso de Processador">
+                <i data-lucide="cpu" class="telemetry-icon"></i>
+                <span id="statCpu" class="telemetry-value">--%</span>
+              </div>
+              <div class="telemetry-pill" title="Memória RAM Usada / Total">
+                <i data-lucide="activity" class="telemetry-icon"></i>
+                <span id="statRam" class="telemetry-value">--/--</span>
+              </div>
+              <div class="telemetry-pill" title="Espaço em Disco">
+                <i data-lucide="hard-drive" class="telemetry-icon"></i>
+                <span id="statDisk" class="telemetry-value">--</span>
+              </div>
+              <div class="telemetry-pill" title="Tempo de Atividade (Uptime)">
+                <i data-lucide="clock" class="telemetry-icon"></i>
+                <span id="statUptime" class="telemetry-value">--</span>
+              </div>
+              <button class="telemetry-btn-mini" onclick="fetchVpsStats()" title="Atualizar Métricas">
+                <i data-lucide="refresh-cw"></i>
               </button>
             </div>
 
-            <!-- BOTÃO SAIR / DESCONECTAR -->
-            <button class="btn-disconnect" onclick="closeActiveSession()">
-              <i data-lucide="power"></i>
-              <span>Desconectar</span>
-            </button>
-          </div>
+            <!-- CONTROLES DA BARRA -->
+            <div class="session-toolbar-right">
+              <!-- BOTÃO OCULTAR / REVELAR TELEMETRIA -->
+              <button class="btn-telemetry-toggle active" id="btnTelemetryToggle" onclick="toggleTelemetryVisibility()" title="Ocultar/Exibir Telemetria de CPU/RAM">
+                <i data-lucide="activity"></i>
+                <span id="telemetryToggleText">Métricas</span>
+              </button>
 
-          <!-- MINI TELEMETRIA VPS EM TEMPO REAL -->
-          <div class="vps-telemetry-bar" id="vpsTelemetryBar">
-            <div class="telemetry-item">
-              <i data-lucide="cpu" class="telemetry-icon"></i>
-              <span class="telemetry-label">CPU:</span>
-              <span id="statCpu" class="telemetry-value">--%</span>
+              <!-- CONTROLES DE LAYOUT -->
+              <div class="layout-switch-group">
+                <button class="layout-btn active" id="layoutSplitVBtn" onclick="setSessionLayout('split-vertical')" title="Lado a Lado (Vertical)">
+                  <i data-lucide="columns-2"></i>
+                </button>
+                <button class="layout-btn" id="layoutSplitHBtn" onclick="setSessionLayout('split-horizontal')" title="Dividido Horizontalmente">
+                  <i data-lucide="rows-2"></i>
+                </button>
+                <button class="layout-btn" id="layoutTermBtn" onclick="setSessionLayout('terminal-focus')" title="Foco no Terminal">
+                  <i data-lucide="terminal"></i>
+                </button>
+                <button class="layout-btn" id="layoutSftpBtn" onclick="setSessionLayout('sftp-focus')" title="Foco nos Arquivos">
+                  <i data-lucide="folder-tree"></i>
+                </button>
+              </div>
+
+              <!-- BOTÃO SAIR / DESCONECTAR -->
+              <button class="btn-disconnect" onclick="closeActiveTab()" title="Fechar esta conexão / aba">
+                <i data-lucide="x"></i>
+                <span>Fechar Aba</span>
+              </button>
             </div>
-            <div class="telemetry-item">
-              <i data-lucide="activity" class="telemetry-icon"></i>
-              <span class="telemetry-label">RAM:</span>
-              <span id="statRam" class="telemetry-value">-- / --</span>
-            </div>
-            <div class="telemetry-item">
-              <i data-lucide="hard-drive" class="telemetry-icon"></i>
-              <span class="telemetry-label">Disco:</span>
-              <span id="statDisk" class="telemetry-value">--</span>
-            </div>
-            <div class="telemetry-item">
-              <i data-lucide="clock" class="telemetry-icon"></i>
-              <span class="telemetry-label">Uptime:</span>
-              <span id="statUptime" class="telemetry-value">--</span>
-            </div>
-            <button class="telemetry-refresh-btn" onclick="fetchVpsStats()" title="Atualizar Métricas">
-              <i data-lucide="refresh-cw"></i>
-            </button>
           </div>
 
           <!-- BARRA DE QUICK ACTIONS POR ATALHO -->
@@ -715,7 +733,12 @@
 
         <div class="form-group" id="authPasswordGroup">
           <label>Senha</label>
-          <input type="password" id="hostPassword" placeholder="Sua senha do SSH" />
+          <div class="password-input-wrapper">
+            <input type="password" id="hostPassword" placeholder="Sua senha do SSH" />
+            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('hostPassword', this)" title="Revelar/Ocultar Senha">
+              <i data-lucide="eye"></i>
+            </button>
+          </div>
         </div>
 
         <div class="form-group" id="authKeyGroup" style="display:none;">

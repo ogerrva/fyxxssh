@@ -925,63 +925,98 @@ app.post('/api/sftp/delete', async (req, res) => {
   const host = data.hosts.find(h => h.id === hostId);
 
   if (!host) return res.status(404).json({ error: 'Servidor não encontrado' });
-  if (!itemPath || itemPath === '/' || itemPath === '/root' || itemPath === '/etc' || itemPath === '/home') {
-    return res.status(400).json({ error: 'Operação não permitida no diretório raiz do sistema.' });
+  if (!itemPath || typeof itemPath !== 'string') {
+    return res.status(400).json({ error: 'Caminho inválido para exclusão.' });
   }
+
+  const cleanPath = itemPath.trim();
+  const protectedPaths = ['/', '/root', '/etc', '/home', '/var', '/usr', '/bin', '/sbin', '/lib', '/boot', '/dev', '/proc', '/sys'];
+  if (protectedPaths.includes(cleanPath)) {
+    return res.status(400).json({ error: 'Operação não permitida em diretório protegido do sistema.' });
+  }
+
+  const isDir = isDirectory === true || isDirectory === 'true';
 
   let client;
   try {
     client = await createSFTPClient(host);
     const { conn, sftp } = client;
 
-    // Escapa aspas para execução segura do comando rm no shell remoto
-    const escapedPath = itemPath.replace(/'/g, "'\\''");
-    const rmCommand = isDirectory ? `rm -rf -- '${escapedPath}'` : `rm -f -- '${escapedPath}'`;
+    // Escapa aspas simples com segurança
+    const escapedPath = cleanPath.replace(/'/g, "'\\''");
+    // rm -rf funciona com máxima autoridade e sem confirmação tanto para arquivos quanto para diretórios
+    const rmCommand = `rm -rf -- '${escapedPath}'`;
 
-    // Tentativa prioritária e ultra-rápida via exec shell nativo
+    let exitCode = null;
+    let stderr = '';
+    let hasResponded = false;
+
     conn.exec(rmCommand, (execErr, stream) => {
       if (execErr) {
-        // Fallback: usar SFTP diretamente caso conn.exec falhe
-        if (isDirectory) {
-          removeSftpDirRecursive(sftp, itemPath, (err) => {
+        // Fallback para SFTP puro caso exec falhe
+        if (isDir) {
+          return removeSftpDirRecursive(sftp, cleanPath, (err) => {
             conn.end();
-            if (err) return res.status(500).json({ error: err.message || 'Falha ao excluir diretório via SFTP.' });
+            if (err) return res.status(500).json({ error: err.message || 'Falha ao excluir diretório no SFTP.' });
             res.json({ success: true });
           });
         } else {
-          sftp.unlink(itemPath, (err) => {
+          return sftp.unlink(cleanPath, (err) => {
             conn.end();
-            if (err) return res.status(500).json({ error: err.message || 'Falha ao excluir arquivo via SFTP.' });
+            if (err) return res.status(500).json({ error: err.message || 'Falha ao excluir arquivo no SFTP.' });
             res.json({ success: true });
           });
         }
-        return;
       }
 
-      let stderr = '';
       stream.stderr.on('data', (d) => { stderr += d.toString(); });
+      stream.on('exit', (code) => { exitCode = code; });
 
-      stream.on('close', (code) => {
-        if (code === 0) {
+      const finalize = () => {
+        if (hasResponded) return;
+        hasResponded = true;
+
+        // Se o exit code for 0, o comando rm -rf removeu com sucesso imediato!
+        if (exitCode === 0) {
           conn.end();
           return res.json({ success: true });
         }
 
-        // Se o comando rm retornou erro no shell, tenta fallback pelo SFTP
-        if (isDirectory) {
-          removeSftpDirRecursive(sftp, itemPath, (err) => {
+        // Confirmação via SFTP stat: se stat der erro, o arquivo/pasta NÃO EXISTE MAIS (foi apagado com sucesso)!
+        sftp.stat(cleanPath, (statErr) => {
+          if (statErr) {
+            // Não existe mais! Sucesso garantido!
             conn.end();
-            if (err) return res.status(500).json({ error: stderr.trim() || err.message });
-            res.json({ success: true });
-          });
-        } else {
-          sftp.unlink(itemPath, (err) => {
-            conn.end();
-            if (err) return res.status(500).json({ error: stderr.trim() || err.message });
-            res.json({ success: true });
-          });
-        }
-      });
+            return res.json({ success: true });
+          }
+
+          // Se ainda existir após rm -rf, tenta remoção alternativa pelo SFTP
+          if (isDir) {
+            removeSftpDirRecursive(sftp, cleanPath, (fallbackErr) => {
+              conn.end();
+              if (fallbackErr) {
+                return res.status(500).json({ error: stderr.trim() || fallbackErr.message || 'Erro ao excluir pasta.' });
+              }
+              res.json({ success: true });
+            });
+          } else {
+            sftp.unlink(cleanPath, (fallbackErr) => {
+              conn.end();
+              if (fallbackErr) {
+                return res.status(500).json({ error: stderr.trim() || fallbackErr.message || 'Erro ao excluir arquivo.' });
+              }
+              res.json({ success: true });
+            });
+          }
+        });
+      };
+
+      stream.on('close', finalize);
+
+      // Timeout preventivo caso o canal fique pendente
+      setTimeout(() => {
+        if (!hasResponded) finalize();
+      }, 4000);
     });
   } catch (err) {
     if (client && client.conn) client.conn.end();

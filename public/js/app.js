@@ -1874,24 +1874,33 @@ function downloadFile(filePath) {
 }
 
 async function deleteSftpItem(itemPath, isDirectory) {
-  const itemType = isDirectory ? 'a pasta' : 'o arquivo';
+  const currentTab = getActiveTab();
+  const hostId = currentTab ? currentTab.hostId : (activeSession ? activeSession.hostId : null);
+  if (!hostId) {
+    showToast('Nenhuma sessão ativa selecionada.', 'error');
+    return;
+  }
+
+  const isDir = isDirectory === true || isDirectory === 'true';
+  const itemType = isDir ? 'a pasta' : 'o arquivo';
   const confirmed = await showConfirmModal({
-    title: `Excluir ${isDirectory ? 'Pasta' : 'Arquivo'}`,
+    title: `Excluir ${isDir ? 'Pasta' : 'Arquivo'}`,
     message: `Tem certeza que deseja excluir permanentemente ${itemType}:\n"${itemPath}"?`,
-    confirmText: 'Excluir',
+    confirmText: 'Excluir Definitivamente',
     isDanger: true
   });
   if (!confirmed) return;
 
   try {
+    showToast(`Excluindo ${itemType}...`, 'info');
     const res = await fetch('/api/sftp/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hostId: activeSession.hostId, itemPath, isDirectory })
+      body: JSON.stringify({ hostId, itemPath, isDirectory: isDir })
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    if (!res.ok) throw new Error(data.error || 'Falha ao excluir');
 
     showToast('Item excluído com sucesso!', 'success');
     refreshSftpList();

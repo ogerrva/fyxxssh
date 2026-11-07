@@ -18,12 +18,22 @@ DisableProgramGroupPage=yes
 OutputDir=dist-installer
 OutputBaseFilename=FYXXSSH-Setup-v1.0.0
 SetupIconFile=build\icon.ico
+WizardImageFile=build\wizard.bmp
+WizardSmallImageFile=build\wizard-small.bmp
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
+
+; Metadados do Executável para o Windows Explorer e SmartScreen
+VersionInfoVersion=1.0.0.0
+VersionInfoCompany=FYXX Technologies
+VersionInfoDescription=FYXXSSH Setup
+VersionInfoProductName=FYXXSSH
+VersionInfoProductVersion=1.0.0.0
+VersionInfoCopyright=Copyright (C) 2026 FYXX Technologies
 
 [Languages]
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"

@@ -303,7 +303,14 @@ app.post('/api/updates/install', (req, res) => {
   }
 
   try {
-    const { spawn } = require('child_process');
+    const { spawn, execSync } = require('child_process');
+    // Remove qualquer bloqueio Mark of the Web do Windows Defender SmartScreen
+    try {
+      execSync(`powershell -NoProfile -Command "Unblock-File -LiteralPath '${installerPath.replace(/'/g, "''")}'"`, { windowsHide: true });
+    } catch (unblockErr) {
+      console.warn('Aviso ao desbloquear instalador:', unblockErr.message);
+    }
+
     // Inicia o instalador em processo desanexado do Node
     const child = spawn(installerPath, [], {
       detached: true,

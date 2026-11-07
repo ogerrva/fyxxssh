@@ -113,9 +113,169 @@ async function loadUserSettings() {
     if (userSettings.layout) {
       setSessionLayout(userSettings.layout, false);
     }
+    initTerminalSettingsUI();
   } catch (e) {
     applyTheme('obsidian', false);
+    initTerminalSettingsUI();
   }
+}
+
+// =================== PERSONALIZAÇÃO VISUAL DO TERMINAL ===================
+function initTerminalSettingsUI() {
+  const fontSelect = document.getElementById('termFontFamilySelect');
+  const sizeSelect = document.getElementById('termFontSizeSelect');
+  const textColorPicker = document.getElementById('termTextColorPicker');
+  const textPreset = document.getElementById('termTextColorPreset');
+  const bgColorPicker = document.getElementById('termBgColorPicker');
+  const bgPreset = document.getElementById('termBgColorPreset');
+
+  if (fontSelect && userSettings.terminalFontFamily) {
+    fontSelect.value = userSettings.terminalFontFamily;
+  }
+  if (sizeSelect && userSettings.terminalFontSize) {
+    sizeSelect.value = userSettings.terminalFontSize;
+  }
+  if (textColorPicker && userSettings.terminalTextColor) {
+    textColorPicker.value = userSettings.terminalTextColor;
+    if (textPreset) {
+      const match = Array.from(textPreset.options).some(o => o.value.toLowerCase() === userSettings.terminalTextColor.toLowerCase());
+      textPreset.value = match ? userSettings.terminalTextColor.toLowerCase() : 'custom';
+    }
+  }
+  if (bgColorPicker && userSettings.terminalBgColor) {
+    bgColorPicker.value = userSettings.terminalBgColor;
+    if (bgPreset) {
+      const match = Array.from(bgPreset.options).some(o => o.value.toLowerCase() === userSettings.terminalBgColor.toLowerCase());
+      bgPreset.value = match ? userSettings.terminalBgColor.toLowerCase() : 'custom';
+    }
+  }
+  if (userSettings.terminalCursorStyle) {
+    const radio = document.querySelector(`input[name="termCursorStyle"][value="${userSettings.terminalCursorStyle}"]`);
+    if (radio) radio.checked = true;
+  }
+
+  updateTerminalPreview();
+}
+
+function openTerminalSettings() {
+  openModal('settingsModal');
+  const section = document.getElementById('termFontFamilySelect');
+  if (section) {
+    setTimeout(() => section.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120);
+  }
+}
+
+function onTerminalColorPresetChange(type, value) {
+  if (value === 'custom') return;
+  if (type === 'text') {
+    const picker = document.getElementById('termTextColorPicker');
+    if (picker) picker.value = value;
+  } else if (type === 'bg') {
+    const picker = document.getElementById('termBgColorPicker');
+    if (picker) picker.value = value;
+  }
+  onTerminalAppearanceChange();
+}
+
+function onTerminalAppearanceChange() {
+  const fontSelect = document.getElementById('termFontFamilySelect');
+  const sizeSelect = document.getElementById('termFontSizeSelect');
+  const textColorPicker = document.getElementById('termTextColorPicker');
+  const textPreset = document.getElementById('termTextColorPreset');
+  const bgColorPicker = document.getElementById('termBgColorPicker');
+  const bgPreset = document.getElementById('termBgColorPreset');
+  const cursorRadio = document.querySelector('input[name="termCursorStyle"]:checked');
+
+  const fontFamily = fontSelect ? fontSelect.value : "'Fira Code', 'Courier New', monospace";
+  const fontSize = sizeSelect ? parseInt(sizeSelect.value, 10) : 13;
+  const textColor = textColorPicker ? textColorPicker.value : '#00e5ff';
+  const bgColor = bgColorPicker ? bgColorPicker.value : '#070a0f';
+  const cursorStyle = cursorRadio ? cursorRadio.value : 'bar';
+
+  // Sincroniza selects de preset
+  if (textPreset) {
+    const match = Array.from(textPreset.options).some(o => o.value.toLowerCase() === textColor.toLowerCase());
+    textPreset.value = match ? textColor.toLowerCase() : 'custom';
+  }
+  if (bgPreset) {
+    const match = Array.from(bgPreset.options).some(o => o.value.toLowerCase() === bgColor.toLowerCase());
+    bgPreset.value = match ? bgColor.toLowerCase() : 'custom';
+  }
+
+  userSettings.terminalFontFamily = fontFamily;
+  userSettings.terminalFontSize = fontSize;
+  userSettings.terminalTextColor = textColor;
+  userSettings.terminalBgColor = bgColor;
+  userSettings.terminalCursorStyle = cursorStyle;
+
+  updateTerminalPreview();
+
+  // Salva no backend
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      terminalFontFamily: fontFamily,
+      terminalFontSize: fontSize,
+      terminalTextColor: textColor,
+      terminalBgColor: bgColor,
+      terminalCursorStyle: cursorStyle
+    })
+  }).catch(() => {});
+
+  // Aplica instantaneamente em todas as instâncias ativas do terminal
+  applyTerminalAppearanceToTabs();
+}
+
+function updateTerminalPreview() {
+  const box = document.getElementById('termPreviewBox');
+  const cursor = document.getElementById('termPreviewCursor');
+  if (!box) return;
+
+  const fontFamily = userSettings.terminalFontFamily || "'Fira Code', monospace";
+  const fontSize = (userSettings.terminalFontSize || 13) + 'px';
+  const textColor = userSettings.terminalTextColor || '#00e5ff';
+  const bgColor = userSettings.terminalBgColor || '#070a0f';
+  const cursorStyle = userSettings.terminalCursorStyle || 'bar';
+
+  box.style.fontFamily = fontFamily;
+  box.style.fontSize = fontSize;
+  box.style.color = textColor;
+  box.style.backgroundColor = bgColor;
+
+  if (cursor) {
+    cursor.style.backgroundColor = textColor;
+    if (cursorStyle === 'block') {
+      cursor.style.width = '8px';
+      cursor.style.height = '14px';
+    } else if (cursorStyle === 'underline') {
+      cursor.style.width = '8px';
+      cursor.style.height = '2px';
+      cursor.style.alignSelf = 'flex-end';
+    } else {
+      cursor.style.width = '2px';
+      cursor.style.height = '14px';
+    }
+  }
+}
+
+function applyTerminalAppearanceToTabs() {
+  const themeObj = getXtermThemeObject(userSettings.theme || 'obsidian');
+  sessionTabs.forEach(tab => {
+    if (tab.xterm) {
+      tab.xterm.options.fontFamily = userSettings.terminalFontFamily || "'Fira Code', 'Courier New', monospace";
+      tab.xterm.options.fontSize = parseInt(userSettings.terminalFontSize, 10) || 13;
+      tab.xterm.options.cursorStyle = userSettings.terminalCursorStyle || 'bar';
+      tab.xterm.options.theme = themeObj;
+      try {
+        tab.xterm.refresh(0, tab.xterm.rows - 1);
+      } catch (e) {}
+    }
+  });
+
+  // Reajusta dimensões das células após mudança de tamanho ou fonte
+  setTimeout(fitActiveTerminal, 60);
+  setTimeout(fitActiveTerminal, 200);
 }
 
 function applyTheme(themeName, persist = true) {
@@ -174,11 +334,7 @@ function setSessionLayout(layoutName, persist = true) {
     }).catch(() => {});
   }
 
-  setTimeout(() => {
-    if (fitAddon) {
-      try { fitAddon.fit(); } catch (e) {}
-    }
-  }, 100);
+  setTimeout(fitActiveTerminal, 50); setTimeout(fitActiveTerminal, 200);
 }
 
 // =================== NAVEGAÇÃO ENTRE TELAS ===================
@@ -207,11 +363,7 @@ function switchMainView(viewName) {
     navSessionBtn.style.display = 'flex';
     breadcrumbs.innerHTML = `<span class="crumb-root" onclick="switchMainView('home')">Início</span> <span class="crumb-sep">></span> <span class="crumb-current">${escapeHtml(activeSession.hostName)}</span>`;
     
-    setTimeout(() => {
-      if (fitAddon) {
-        try { fitAddon.fit(); } catch (e) {}
-      }
-    }, 100);
+    setTimeout(fitActiveTerminal, 50); setTimeout(fitActiveTerminal, 200);
   }
 }
 
@@ -499,24 +651,29 @@ function getActiveTab() {
 }
 
 function getXtermThemeObject(themeName) {
-  let bg = '#070a0f';
-  let cursor = '#00e5ff';
+  let bg = userSettings.terminalBgColor || '#070a0f';
+  let fg = userSettings.terminalTextColor || '#00e5ff';
+  let cursor = userSettings.terminalTextColor || '#00e5ff';
 
-  if (themeName === 'cyberpunk') {
-    bg = '#0d0b18';
-    cursor = '#f43f5e';
-  } else if (themeName === 'dracula') {
-    bg = '#1e1f29';
-    cursor = '#bd93f9';
-  } else if (themeName === 'nordic') {
-    bg = '#181e28';
-    cursor = '#88c0d0';
+  if (!userSettings.terminalBgColor) {
+    if (themeName === 'cyberpunk') {
+      bg = '#0d0b18';
+      cursor = '#f43f5e';
+    } else if (themeName === 'dracula') {
+      bg = '#1e1f29';
+      cursor = '#bd93f9';
+    } else if (themeName === 'nordic') {
+      bg = '#181e28';
+      cursor = '#88c0d0';
+    }
   }
 
   return {
     background: bg,
-    foreground: '#e6edf3',
+    foreground: fg,
     cursor: cursor,
+    cursorAccent: bg,
+    selectionBackground: 'rgba(0, 229, 255, 0.3)',
     black: '#1f242c',
     red: '#ff5c57',
     green: '#5af78e',
@@ -548,13 +705,13 @@ async function openSession(hostId, targetPath = '/root', preferredLayout = 'spli
   tabContainer.id = `xterm_instance_${tabId}`;
   mainContainer.appendChild(tabContainer);
 
-  // Instancia terminal xterm
+  // Instancia terminal xterm com personalizações do usuário
   const xterm = new Terminal({
     theme: getXtermThemeObject(userSettings.theme || 'obsidian'),
-    fontSize: 13,
-    fontFamily: "'Fira Code', 'Courier New', monospace",
+    fontSize: parseInt(userSettings.terminalFontSize, 10) || 13,
+    fontFamily: userSettings.terminalFontFamily || "'Fira Code', 'Courier New', monospace",
+    cursorStyle: userSettings.terminalCursorStyle || 'bar',
     cursorBlink: true,
-    cursorStyle: 'bar',
     convertEol: true
   });
 
@@ -594,6 +751,7 @@ async function openSession(hostId, targetPath = '/root', preferredLayout = 'spli
   };
 
   sessionTabs.push(newTab);
+  activeTabId = tabId;
   activeSession = {
     hostId: host.id,
     hostName: host.name,
@@ -646,6 +804,8 @@ async function openSession(hostId, targetPath = '/root', preferredLayout = 'spli
       cols: xterm.cols || 80,
       rows: xterm.rows || 24
     }));
+    setTimeout(fitActiveTerminal, 60);
+    setTimeout(fitActiveTerminal, 250);
   };
 
   socket.onmessage = (event) => {
@@ -821,6 +981,8 @@ function closeActiveSession() {
   showToast('Sessão encerrada.', 'info');
 }
 
+let windowResizeTimer = null;
+
 function setupTerminalResizeObserver() {
   const container = document.getElementById('xtermContainer');
   if (!container || sessionResizeObserver) return;
@@ -832,18 +994,43 @@ function setupTerminalResizeObserver() {
 }
 
 function handleWindowResize() {
+  clearTimeout(windowResizeTimer);
+  windowResizeTimer = setTimeout(() => {
+    fitActiveTerminal();
+  }, 35);
+}
+
+function fitActiveTerminal() {
   const tab = getActiveTab();
-  if (tab && tab.fitAddon) {
-    try {
-      tab.fitAddon.fit();
-      if (tab.xterm && tab.socket && tab.socket.readyState === WebSocket.OPEN) {
+  if (!tab || !tab.fitAddon || !tab.xterm) return;
+
+  // Não ajusta se o container do terminal não estiver visível
+  if (tab.containerEl && tab.containerEl.offsetParent === null) return;
+
+  try {
+    const oldCols = tab.xterm.cols;
+    const oldRows = tab.xterm.rows;
+
+    tab.fitAddon.fit();
+
+    const newCols = tab.xterm.cols;
+    const newRows = tab.xterm.rows;
+
+    if (newCols && newRows && (newCols !== oldCols || newRows !== oldRows || !tab.hasInitialFit)) {
+      tab.hasInitialFit = true;
+      if (tab.socket && tab.socket.readyState === WebSocket.OPEN) {
         tab.socket.send(JSON.stringify({
           type: 'resize',
-          cols: tab.xterm.cols,
-          rows: tab.xterm.rows
+          cols: newCols,
+          rows: newRows
         }));
       }
-    } catch(e) {}
+      try {
+        tab.xterm.refresh(0, newRows - 1);
+      } catch (e) {}
+    }
+  } catch (e) {
+    console.warn('Erro ao ajustar dimensões do terminal:', e);
   }
 }
 

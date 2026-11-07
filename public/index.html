@@ -28,7 +28,7 @@
         <img src="images/logo.png" class="brand-logo-img" alt="FYXXSSH" />
       </div>
       <span class="brand-name">FYXX<strong>SSH</strong></span>
-      <span class="app-version-pill">v1.0.3 Pro</span>
+      <span class="app-version-pill">v1.0.4 Pro</span>
     </div>
 
     <div class="window-title-center">
@@ -299,6 +299,7 @@
                     <button class="icon-btn-tiny" onclick="searchTerminalNext()"><i data-lucide="chevron-down"></i></button>
                     <button class="icon-btn-tiny" onclick="closeTermSearch()">&times;</button>
                   </div>
+                  <button class="icon-btn-tiny" onclick="openTerminalSettings()" title="Personalizar Fonte e Cores do Terminal"><i data-lucide="type"></i></button>
                   <button class="icon-btn-tiny" onclick="toggleTermSearch()" title="Buscar texto (Ctrl+F)"><i data-lucide="search"></i></button>
                   <button class="icon-btn-tiny" onclick="pasteToTerminal()" title="Colar (Ctrl+V)"><i data-lucide="clipboard"></i></button>
                   <button class="icon-btn-tiny" onclick="clearActiveTerminal()" title="Limpar tela"><i data-lucide="eraser"></i></button>
@@ -628,6 +629,104 @@
             <input type="radio" name="defaultLayout" value="sftp-focus" onchange="setSessionLayout('sftp-focus')" />
             <span>SFTP Focus (Maximizar Explorador de Arquivos)</span>
           </label>
+        </div>
+      </div>
+
+            <div class="form-divider" style="margin: 16px 0; border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));"></div>
+      <div class="form-section-title" style="display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 12px; color: var(--accent-color, #00e5ff);">
+        <i data-lucide="terminal"></i>
+        <span>Personalização do Terminal (Fonte & Cores)</span>
+      </div>
+
+      <div class="terminal-settings-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="termFontFamilySelect">Família da Fonte</label>
+          <select id="termFontFamilySelect" class="form-control" onchange="onTerminalAppearanceChange()">
+            <option value="'Fira Code', 'Courier New', monospace">Fira Code (Moderno)</option>
+            <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+            <option value="'Cascadia Code', 'Consolas', monospace">Cascadia Code</option>
+            <option value="'Consolas', monospace">Consolas</option>
+            <option value="'Courier New', monospace">Courier New</option>
+            <option value="monospace">Padrão Monospace</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="termFontSizeSelect">Tamanho da Fonte</label>
+          <select id="termFontSizeSelect" class="form-control" onchange="onTerminalAppearanceChange()">
+            <option value="11">11 px (Compacto)</option>
+            <option value="12">12 px</option>
+            <option value="13" selected>13 px (Padrão)</option>
+            <option value="14">14 px (Médio)</option>
+            <option value="15">15 px</option>
+            <option value="16">16 px (Grande)</option>
+            <option value="18">18 px (Extra Grande)</option>
+            <option value="20">20 px</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="terminal-settings-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>Cor do Texto</label>
+          <div class="color-picker-row" style="display: flex; align-items: center; gap: 8px;">
+            <input type="color" id="termTextColorPicker" value="#00e5ff" onchange="onTerminalAppearanceChange()" style="width: 38px; height: 34px; border: 1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius: 6px; cursor: pointer; background: transparent; padding: 2px;" />
+            <select id="termTextColorPreset" class="form-control" onchange="onTerminalColorPresetChange('text', this.value)" style="flex: 1;">
+              <option value="#00e5ff">Ciano Neon (#00e5ff)</option>
+              <option value="#00ff66">Verde Matrix (#00ff66)</option>
+              <option value="#f8fafc">Branco Obsidian (#f8fafc)</option>
+              <option value="#ffb700">Âmbar Solar (#ffb700)</option>
+              <option value="#c084fc">Roxo Synthwave (#c084fc)</option>
+              <option value="#ff4081">Rosa Shocking (#ff4081)</option>
+              <option value="custom">Personalizado...</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>Fundo do Terminal</label>
+          <div class="color-picker-row" style="display: flex; align-items: center; gap: 8px;">
+            <input type="color" id="termBgColorPicker" value="#070a0f" onchange="onTerminalAppearanceChange()" style="width: 38px; height: 34px; border: 1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius: 6px; cursor: pointer; background: transparent; padding: 2px;" />
+            <select id="termBgColorPreset" class="form-control" onchange="onTerminalColorPresetChange('bg', this.value)" style="flex: 1;">
+              <option value="#070a0f">Obsidian (#070a0f)</option>
+              <option value="#000000">Preto Puro (#000000)</option>
+              <option value="#0d1117">GitHub Dark (#0d1117)</option>
+              <option value="#1e1e2e">Dracula Slate (#1e1e2e)</option>
+              <option value="#10192b">Nordic Deep (#10192b)</option>
+              <option value="custom">Personalizado...</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
+        <label>Estilo do Cursor</label>
+        <div style="display: flex; gap: 16px;">
+          <label class="radio-label">
+            <input type="radio" name="termCursorStyle" value="bar" checked onchange="onTerminalAppearanceChange()" />
+            <span>Barra (|)</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="termCursorStyle" value="block" onchange="onTerminalAppearanceChange()" />
+            <span>Bloco (█)</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="termCursorStyle" value="underline" onchange="onTerminalAppearanceChange()" />
+            <span>Sublinhado (_)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top: 14px; margin-bottom: 12px;">
+        <label>Pré-visualização do Terminal</label>
+        <div id="termPreviewBox" style="background-color: #070a0f; border: 1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius: 8px; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 13px; color: #00e5ff; line-height: 1.5; box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);">
+          <div><span style="color: #10b981;">root@vps</span>:<span style="color: #60a5fa;">~</span># uname -a</div>
+          <div style="opacity: 0.9;">Linux fyxx-server 6.1.0 #1 SMP Debian FYXXSSH x86_64</div>
+          <div style="display: flex; align-items: center; gap: 2px;">
+            <span><span style="color: #10b981;">root@vps</span>:<span style="color: #60a5fa;">~</span># </span>
+            <span id="termPreviewInput">echo "FYXXSSH Terminal PRO"</span>
+            <span id="termPreviewCursor" style="display: inline-block; width: 8px; height: 14px; background: #00e5ff; animation: termBlink 1s infinite;"></span>
+          </div>
         </div>
       </div>
 

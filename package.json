@@ -1,7 +1,7 @@
 {
   "name": "fyxxssh",
   "productName": "FYXXSSH",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "FYXXSSH - Ultimate High-Speed SSH & SFTP Workspace Client",
   "main": "main.js",
   "scripts": {

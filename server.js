@@ -869,31 +869,120 @@ app.post('/api/sftp/mkdir', async (req, res) => {
   }
 });
 
+// Função auxiliar para exclusão recursiva via SFTP caso conn.exec não esteja disponível
+function removeSftpDirRecursive(sftp, dirPath, callback) {
+  sftp.readdir(dirPath, (err, list) => {
+    if (err) return callback(err);
+
+    let pending = list.length;
+    if (pending === 0) {
+      return sftp.rmdir(dirPath, callback);
+    }
+
+    let errorOccurred = false;
+    for (const item of list) {
+      if (item.filename === '.' || item.filename === '..') {
+        pending--;
+        if (pending === 0 && !errorOccurred) {
+          sftp.rmdir(dirPath, callback);
+        }
+        continue;
+      }
+
+      const itemFullPath = dirPath.replace(/\/+$/, '') + '/' + item.filename;
+      const isSubDir = item.longname ? item.longname.startsWith('d') : (item.attrs && (item.attrs.mode & 0o040000));
+
+      if (isSubDir) {
+        removeSftpDirRecursive(sftp, itemFullPath, (subErr) => {
+          if (subErr && !errorOccurred) {
+            errorOccurred = true;
+            return callback(subErr);
+          }
+          pending--;
+          if (pending === 0 && !errorOccurred) {
+            sftp.rmdir(dirPath, callback);
+          }
+        });
+      } else {
+        sftp.unlink(itemFullPath, (unErr) => {
+          if (unErr && !errorOccurred) {
+            errorOccurred = true;
+            return callback(unErr);
+          }
+          pending--;
+          if (pending === 0 && !errorOccurred) {
+            sftp.rmdir(dirPath, callback);
+          }
+        });
+      }
+    }
+  });
+}
+
 app.post('/api/sftp/delete', async (req, res) => {
   const { hostId, itemPath, isDirectory } = req.body;
   const data = loadStorage();
   const host = data.hosts.find(h => h.id === hostId);
 
   if (!host) return res.status(404).json({ error: 'Servidor não encontrado' });
+  if (!itemPath || itemPath === '/' || itemPath === '/root' || itemPath === '/etc' || itemPath === '/home') {
+    return res.status(400).json({ error: 'Operação não permitida no diretório raiz do sistema.' });
+  }
 
   let client;
   try {
     client = await createSFTPClient(host);
     const { conn, sftp } = client;
 
-    if (isDirectory) {
-      sftp.rmdir(itemPath, (err) => {
-        conn.end();
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true });
+    // Escapa aspas para execução segura do comando rm no shell remoto
+    const escapedPath = itemPath.replace(/'/g, "'\\''");
+    const rmCommand = isDirectory ? `rm -rf -- '${escapedPath}'` : `rm -f -- '${escapedPath}'`;
+
+    // Tentativa prioritária e ultra-rápida via exec shell nativo
+    conn.exec(rmCommand, (execErr, stream) => {
+      if (execErr) {
+        // Fallback: usar SFTP diretamente caso conn.exec falhe
+        if (isDirectory) {
+          removeSftpDirRecursive(sftp, itemPath, (err) => {
+            conn.end();
+            if (err) return res.status(500).json({ error: err.message || 'Falha ao excluir diretório via SFTP.' });
+            res.json({ success: true });
+          });
+        } else {
+          sftp.unlink(itemPath, (err) => {
+            conn.end();
+            if (err) return res.status(500).json({ error: err.message || 'Falha ao excluir arquivo via SFTP.' });
+            res.json({ success: true });
+          });
+        }
+        return;
+      }
+
+      let stderr = '';
+      stream.stderr.on('data', (d) => { stderr += d.toString(); });
+
+      stream.on('close', (code) => {
+        if (code === 0) {
+          conn.end();
+          return res.json({ success: true });
+        }
+
+        // Se o comando rm retornou erro no shell, tenta fallback pelo SFTP
+        if (isDirectory) {
+          removeSftpDirRecursive(sftp, itemPath, (err) => {
+            conn.end();
+            if (err) return res.status(500).json({ error: stderr.trim() || err.message });
+            res.json({ success: true });
+          });
+        } else {
+          sftp.unlink(itemPath, (err) => {
+            conn.end();
+            if (err) return res.status(500).json({ error: stderr.trim() || err.message });
+            res.json({ success: true });
+          });
+        }
       });
-    } else {
-      sftp.unlink(itemPath, (err) => {
-        conn.end();
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true });
-      });
-    }
+    });
   } catch (err) {
     if (client && client.conn) client.conn.end();
     res.status(500).json({ error: err.message });

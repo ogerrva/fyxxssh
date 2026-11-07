@@ -2600,3 +2600,229 @@ code, pre, .mono {
   opacity: 0.4;
   background-color: rgba(255, 255, 255, 0.08);
 }
+
+/* ================= COMPONENTES DE AUTO-UPDATE ================= */
+.update-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(236, 72, 153, 0.25));
+  border: 1px solid rgba(236, 72, 153, 0.5);
+  color: #fbcfe8;
+  padding: 3px 12px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  animation: updatePulseGlow 2.5s infinite;
+  margin-left: 8px;
+}
+
+.update-pill-badge:hover {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(236, 72, 153, 0.4));
+  border-color: #f43f5e;
+  transform: translateY(-1px);
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.5);
+}
+
+.update-pill-badge i {
+  width: 13px;
+  height: 13px;
+  color: #f43f5e;
+}
+
+@keyframes updatePulseGlow {
+  0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.4); }
+  70% { box-shadow: 0 0 0 8px rgba(236, 72, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+}
+
+.update-modal-card {
+  max-width: 520px;
+  width: 90%;
+  background: #0f141f;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(168, 85, 247, 0.2);
+}
+
+.update-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 16px 20px;
+}
+
+.update-header-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.update-icon-glow {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 0 16px rgba(236, 72, 153, 0.4);
+}
+
+.update-icon-glow i {
+  width: 20px;
+  height: 20px;
+}
+
+.update-modal-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.update-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.version-diff-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+}
+
+.ver-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.ver-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.ver-badge {
+  font-size: 14px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-family: 'Fira Code', monospace;
+}
+
+.ver-badge.current {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ver-badge.latest {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(59, 130, 246, 0.2));
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.25);
+}
+
+.ver-arrow-box i {
+  width: 20px;
+  height: 20px;
+  color: var(--accent-primary);
+}
+
+.update-notes-box {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.update-notes-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  letter-spacing: 0.4px;
+}
+
+.update-notes-content {
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  max-height: 140px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.update-download-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.download-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.download-percent {
+  color: var(--accent-primary);
+  font-family: 'Fira Code', monospace;
+}
+
+.download-progress-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.download-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #a855f7, #3b82f6);
+  border-radius: 4px;
+  transition: width 0.2s ease;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+}
+
+.download-bytes-info {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: 'Fira Code', monospace;
+  text-align: right;
+}
+
+.btn-update-action {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  border: none;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.4);
+  transition: all 0.2s;
+}
+
+.btn-update-action:hover {
+  background: linear-gradient(135deg, #b865ff, #7376ff);
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.6);
+  transform: translateY(-1px);
+}

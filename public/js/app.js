@@ -36,6 +36,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupDragAndDrop();
   setupGlobalEvents();
   window.addEventListener('resize', handleWindowResize);
+  
+  // Checagem automática e silenciosa de atualizações no GitHub
+  setTimeout(() => {
+    checkAppUpdates(true);
+  }, 2500);
 });
 
 // =================== CONTROLES DE JANELA NATIVA (ELECTRON) ===================
@@ -1988,4 +1993,164 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// =================== AUTO-UPDATE FYXXSSH (GITHUB) ===================
+let appUpdateData = null;
+let updatePollingTimer = null;
+
+async function checkAppUpdates(silent = false) {
+  try {
+    if (!silent) {
+      showToast('Buscando atualizações no GitHub...', 'info');
+    }
+
+    const res = await fetch('/api/updates/check');
+    const data = await res.json();
+
+    if (!data.success) {
+      if (!silent) {
+        showToast('Não foi possível verificar atualizações: ' + (data.error || 'Erro desconhecido'), 'error');
+      }
+      return;
+    }
+
+    appUpdateData = data;
+
+    // Atualiza badges visuais se houver atualização disponível
+    const pillBadge = document.getElementById('updatePillBadge');
+    const pillText = document.getElementById('updatePillText');
+
+    if (data.updateAvailable) {
+      if (pillBadge) {
+        pillBadge.style.display = 'inline-flex';
+        if (pillText) pillText.textContent = `Nova Versão v${data.latestVersion}`;
+      }
+
+      // Popula o modal de update
+      const curVerEl = document.getElementById('updateCurrentVer');
+      const latVerEl = document.getElementById('updateLatestVer');
+      const notesEl = document.getElementById('updateReleaseNotes');
+      const subEl = document.getElementById('updateModalSubtitle');
+
+      if (curVerEl) curVerEl.textContent = `v${data.currentVersion}`;
+      if (latVerEl) latVerEl.textContent = `v${data.latestVersion}`;
+      if (subEl) subEl.textContent = `A versão ${data.name || data.latestVersion} está pronta para download!`;
+      if (notesEl) {
+        notesEl.textContent = data.notes && data.notes.trim() ? data.notes : 'Melhorias de desempenho, velocidade na conexão SSH/SFTP e correções de estabilidade.';
+      }
+
+      if (!silent) {
+        openUpdateModal();
+      } else {
+        showToast(`🚀 Nova versão v${data.latestVersion} do FYXXSSH disponível! Clique no topo para atualizar.`, 'info');
+      }
+    } else {
+      if (pillBadge) {
+        pillBadge.style.display = 'none';
+      }
+      if (!silent) {
+        showToast(`Você já está na versão mais recente do FYXXSSH (v${data.currentVersion})!`, 'success');
+      }
+    }
+  } catch (err) {
+    if (!silent) {
+      showToast('Erro ao consultar atualizações: ' + err.message, 'error');
+    }
+  }
+}
+
+function openUpdateModal() {
+  openModal('updateModal');
+  if (window.lucide) lucide.createIcons();
+}
+
+async function handleUpdateActionClick() {
+  const btn = document.getElementById('btnUpdateAction');
+  const btnText = document.getElementById('btnUpdateActionText');
+  const downloadSection = document.getElementById('updateDownloadSection');
+  const statusText = document.getElementById('updateDownloadStatusText');
+  const percentText = document.getElementById('updateDownloadPercent');
+  const progressBar = document.getElementById('updateProgressBar');
+  const bytesInfo = document.getElementById('updateDownloadBytes');
+
+  // Caso 1: Se já terminou o download, clica para instalar e reiniciar
+  if (btn && btn.dataset.readyToInstall === 'true') {
+    btn.disabled = true;
+    btnText.textContent = 'Iniciando instalador...';
+    showToast('Executando instalador... O FYXXSSH será fechado agora.', 'info');
+
+    try {
+      const res = await fetch('/api/updates/install', { method: 'POST' });
+      const data = await res.json();
+      if (!data.success) {
+        showToast('Erro ao iniciar instalador: ' + data.error, 'error');
+        btn.disabled = false;
+      }
+    } catch (e) {
+      showToast('Instalador acionado com sucesso. Fechando aplicativo...', 'info');
+    }
+    return;
+  }
+
+  // Caso 2: Iniciar o download
+  if (downloadSection) downloadSection.style.display = 'flex';
+  if (btn) btn.disabled = true;
+  if (btnText) btnText.textContent = 'Baixando...';
+
+  try {
+    const res = await fetch('/api/updates/download', { method: 'POST' });
+    const data = await res.json();
+
+    if (!data.success) {
+      showToast('Falha ao iniciar download: ' + data.error, 'error');
+      if (btn) btn.disabled = false;
+      if (btnText) btnText.textContent = 'Tentar Novamente';
+      return;
+    }
+
+    // Inicia polling de progresso a cada 350ms
+    if (updatePollingTimer) clearInterval(updatePollingTimer);
+    updatePollingTimer = setInterval(async () => {
+      try {
+        const progRes = await fetch('/api/updates/progress');
+        const prog = await progRes.json();
+
+        if (progressBar) progressBar.style.width = `${prog.progress || 0}%`;
+        if (percentText) percentText.textContent = `${prog.progress || 0}%`;
+        if (bytesInfo) {
+          bytesInfo.textContent = `${formatBytes(prog.transferredBytes || 0)} / ${formatBytes(prog.totalBytes || 0)}`;
+        }
+
+        if (prog.status === 'ready') {
+          clearInterval(updatePollingTimer);
+          updatePollingTimer = null;
+          if (statusText) statusText.textContent = 'Download concluído com sucesso!';
+          if (btn) {
+            btn.disabled = false;
+            btn.dataset.readyToInstall = 'true';
+            btn.classList.add('ready-to-install');
+          }
+          if (btnText) btnText.textContent = 'Reiniciar e Atualizar Agora';
+          showToast('Download concluído! Clique em "Reiniciar e Atualizar Agora" para aplicar.', 'success');
+        } else if (prog.status === 'error') {
+          clearInterval(updatePollingTimer);
+          updatePollingTimer = null;
+          if (statusText) statusText.textContent = 'Falha no download: ' + (prog.errorMessage || 'Erro de conexão');
+          if (btn) {
+            btn.disabled = false;
+            btn.dataset.readyToInstall = 'false';
+          }
+          if (btnText) btnText.textContent = 'Tentar Novamente';
+          showToast('Erro no download da atualização.', 'error');
+        }
+      } catch (e) {
+        console.warn('Erro ao consultar progresso de update:', e);
+      }
+    }, 350);
+  } catch (err) {
+    showToast('Erro ao baixar atualização: ' + err.message, 'error');
+    if (btn) btn.disabled = false;
+    if (btnText) btnText.textContent = 'Atualizar Agora';
+  }
 }

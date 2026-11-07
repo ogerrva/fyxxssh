@@ -28,7 +28,7 @@
         <img src="images/logo.png" class="brand-logo-img" alt="FYXXSSH" />
       </div>
       <span class="brand-name">FYXX<strong>SSH</strong></span>
-      <span class="app-version-pill">v1.0 Pro</span>
+      <span class="app-version-pill">v1.0.1 Pro</span>
     </div>
 
     <div class="window-title-center">
@@ -36,9 +36,16 @@
         <span class="status-pulse-dot"></span>
         <span id="globalStatusText">Desconectado</span>
       </div>
+      <div class="update-pill-badge" id="updatePillBadge" style="display:none;" onclick="openUpdateModal()" title="Nova versão disponível! Clique para atualizar">
+        <i data-lucide="sparkles"></i>
+        <span id="updatePillText">Atualização Disponível</span>
+      </div>
     </div>
 
     <div class="window-title-controls">
+      <button class="win-btn" onclick="checkAppUpdates(false)" title="Verificar Atualizações do Sistema">
+        <i data-lucide="refresh-cw"></i>
+      </button>
       <button class="win-btn" onclick="openModal('settingsModal')" title="Temas & Layouts">
         <i data-lucide="palette"></i>
       </button>
@@ -773,6 +780,67 @@
         <button type="button" class="btn-secondary" onclick="closeModal('editorModal')">Fechar</button>
         <button type="button" class="btn-primary" onclick="saveRemoteFile()">
           <i data-lucide="save"></i> Salvar no Servidor
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ATUALIZAÇÃO DO PROGRAMA (AUTO-UPDATE) -->
+  <div id="updateModal" class="modal-overlay">
+    <div class="modal-card update-modal-card">
+      <div class="modal-header update-modal-header">
+        <div class="update-header-info">
+          <div class="update-icon-glow">
+            <i data-lucide="sparkles"></i>
+          </div>
+          <div>
+            <h3>Atualização do FYXXSSH</h3>
+            <p class="update-modal-sub" id="updateModalSubtitle">Uma nova versão está disponível no GitHub!</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" onclick="closeModal('updateModal')">&times;</button>
+      </div>
+
+      <div class="update-modal-body">
+        <div class="version-diff-card">
+          <div class="ver-col">
+            <span class="ver-title">Versão Atual</span>
+            <span class="ver-badge current" id="updateCurrentVer">v1.0.0</span>
+          </div>
+          <div class="ver-arrow-box">
+            <i data-lucide="arrow-right"></i>
+          </div>
+          <div class="ver-col">
+            <span class="ver-title">Nova Versão</span>
+            <span class="ver-badge latest" id="updateLatestVer">v1.0.1</span>
+          </div>
+        </div>
+
+        <div class="update-notes-box">
+          <div class="update-notes-title">Novidades da Versão:</div>
+          <div class="update-notes-content" id="updateReleaseNotes">
+            Carregando notas da versão...
+          </div>
+        </div>
+
+        <!-- Área de Progresso de Download -->
+        <div id="updateDownloadSection" style="display:none;" class="update-download-section">
+          <div class="download-labels">
+            <span id="updateDownloadStatusText">Baixando instalador...</span>
+            <span id="updateDownloadPercent" class="download-percent">0%</span>
+          </div>
+          <div class="download-progress-track">
+            <div id="updateProgressBar" class="download-progress-fill" style="width: 0%;"></div>
+          </div>
+          <div class="download-bytes-info" id="updateDownloadBytes">0 MB / 0 MB</div>
+        </div>
+      </div>
+
+      <div class="modal-footer update-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('updateModal')">Mais Tarde</button>
+        <button type="button" class="btn-primary btn-update-action" id="btnUpdateAction" onclick="handleUpdateActionClick()">
+          <i data-lucide="download"></i>
+          <span id="btnUpdateActionText">Atualizar Agora</span>
         </button>
       </div>
     </div>

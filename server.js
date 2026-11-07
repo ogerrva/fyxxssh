@@ -78,41 +78,21 @@ function saveStorage(data) {
   }
 }
 
-// Helpers SSH
+// Diretório permanente para downloads de atualizações
+const UPDATES_DIR = path.join(USER_DATA_DIR, 'updates');
+if (!fs.existsSync(UPDATES_DIR)) {
+  fs.mkdirSync(UPDATES_DIR, { recursive: true });
+}
+
+// Helpers SSH com compatibilidade universal e alta velocidade
 function getSSHConfig(host) {
   const config = {
     host: host.host,
-    port: parseInt(host.port) || 22,
+    port: parseInt(host.port, 10) || 22,
     username: host.username || 'root',
-    readyTimeout: 25000,
+    readyTimeout: 30000,
     keepaliveInterval: 10000,
-    keepaliveCountMax: 3,
-    // Otimização máxima de velocidade e conexão: Ciphers modernos de aceleração por hardware
-    algorithms: {
-      kex: [
-        'curve25519-sha256',
-        'curve25519-sha256@libssh.org',
-        'ecdh-sha2-nistp256',
-        'diffie-hellman-group-exchange-sha256',
-        'diffie-hellman-group14-sha256'
-      ],
-      cipher: [
-        'chacha20-poly1305@openssh.com',
-        'aes128-gcm@openssh.com',
-        'aes256-gcm@openssh.com',
-        'aes128-ctr',
-        'aes192-ctr',
-        'aes256-ctr'
-      ],
-      serverHostKey: [
-        'ssh-ed25519',
-        'ecdsa-sha2-nistp256',
-        'rsa-sha2-512',
-        'rsa-sha2-256',
-        'ssh-rsa'
-      ],
-      compress: ['none', 'zlib@openssh.com']
-    }
+    keepaliveCountMax: 5
   };
 
   if (host.authType === 'key' && host.privateKey) {
@@ -124,6 +104,222 @@ function getSSHConfig(host) {
 
   return config;
 }
+
+// =================== SISTEMA DE ATUALIZAÇÃO AUTOMÁTICA (GITHUB) ===================
+const APP_PACKAGE = require('./package.json');
+const CURRENT_VERSION = APP_PACKAGE.version || '1.0.0';
+const GITHUB_REPO = 'ogerrva/fyxxssh';
+
+let updateState = {
+  status: 'idle', // 'idle' | 'checking' | 'downloading' | 'ready' | 'error'
+  progress: 0,
+  totalBytes: 0,
+  transferredBytes: 0,
+  latestVersion: null,
+  currentVersion: CURRENT_VERSION,
+  releaseName: '',
+  releaseNotes: '',
+  downloadUrl: null,
+  assetName: null,
+  localInstallerPath: null,
+  errorMessage: null
+};
+
+function parseVersionNumbers(v) {
+  return (v || '').replace(/^[^\d]*/, '').split('.').map(n => parseInt(n, 10) || 0);
+}
+
+function compareSemVer(vLatest, vCurrent) {
+  const p1 = parseVersionNumbers(vLatest);
+  const p2 = parseVersionNumbers(vCurrent);
+  const len = Math.max(p1.length, p2.length);
+  for (let i = 0; i < len; i++) {
+    const num1 = p1[i] || 0;
+    const num2 = p2[i] || 0;
+    if (num1 > num2) return 1;
+    if (num1 < num2) return -1;
+  }
+  return 0;
+}
+
+function fetchGithubJson(url) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      headers: {
+        'User-Agent': 'FYXXSSH-App/' + CURRENT_VERSION,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    };
+    https.get(url, options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(new Error('Erro ao interpretar JSON do GitHub'));
+          }
+        } else {
+          reject(new Error(`GitHub retornou status ${res.statusCode}: ${data}`));
+        }
+      });
+    }).on('error', reject);
+  });
+}
+
+function downloadFileWithRedirects(url, destPath, onProgress) {
+  return new Promise((resolve, reject) => {
+    function startGet(currentUrl, redirectCount = 0) {
+      if (redirectCount > 8) {
+        return reject(new Error('Muitos redirecionamentos'));
+      }
+      const client = currentUrl.startsWith('https:') ? https : http;
+      client.get(currentUrl, { headers: { 'User-Agent': 'FYXXSSH-App/' + CURRENT_VERSION } }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return startGet(res.headers.location, redirectCount + 1);
+        }
+        if (res.statusCode !== 200) {
+          return reject(new Error(`Falha no download (HTTP ${res.statusCode})`));
+        }
+
+        const total = parseInt(res.headers['content-length'] || 0, 10);
+        let transferred = 0;
+        const out = fs.createWriteStream(destPath);
+
+        res.on('data', chunk => {
+          transferred += chunk.length;
+          if (onProgress) onProgress(transferred, total);
+        });
+
+        res.pipe(out);
+        out.on('finish', () => {
+          out.close(() => resolve({ destPath, total }));
+        });
+        out.on('error', err => {
+          fs.unlink(destPath, () => {});
+          reject(err);
+        });
+      }).on('error', reject);
+    }
+
+    startGet(url);
+  });
+}
+
+// ROTA 1: Verificar se há nova versão no GitHub
+app.get('/api/updates/check', async (req, res) => {
+  try {
+    const release = await fetchGithubJson(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+    const remoteTag = release.tag_name || '';
+    const cleanRemoteVer = remoteTag.replace(/^v/, '');
+    const hasUpdate = compareSemVer(cleanRemoteVer, CURRENT_VERSION) > 0;
+
+    // Localizar o executável do instalador nos assets
+    let exeAsset = null;
+    if (Array.isArray(release.assets)) {
+      exeAsset = release.assets.find(a => a.name.toLowerCase().endsWith('.exe')) || release.assets[0];
+    }
+
+    updateState.latestVersion = cleanRemoteVer;
+    updateState.currentVersion = CURRENT_VERSION;
+    updateState.releaseName = release.name || remoteTag;
+    updateState.releaseNotes = release.body || '';
+    updateState.downloadUrl = exeAsset ? exeAsset.browser_download_url : null;
+    updateState.assetName = exeAsset ? exeAsset.name : null;
+    updateState.totalBytes = exeAsset ? exeAsset.size : 0;
+
+    res.json({
+      success: true,
+      updateAvailable: hasUpdate,
+      currentVersion: CURRENT_VERSION,
+      latestVersion: cleanRemoteVer,
+      tag: remoteTag,
+      name: release.name || remoteTag,
+      notes: release.body || '',
+      downloadUrl: updateState.downloadUrl,
+      assetName: updateState.assetName,
+      assetSize: updateState.totalBytes,
+      publishedAt: release.published_at
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      updateAvailable: false,
+      currentVersion: CURRENT_VERSION,
+      error: err.message
+    });
+  }
+});
+
+// ROTA 2: Obter status/progresso atual do update
+app.get('/api/updates/progress', (req, res) => {
+  res.json(updateState);
+});
+
+// ROTA 3: Iniciar o download da nova versão
+app.post('/api/updates/download', async (req, res) => {
+  if (updateState.status === 'downloading') {
+    return res.json({ success: true, message: 'Download já em andamento', state: updateState });
+  }
+
+  if (!updateState.downloadUrl) {
+    return res.status(400).json({ success: false, error: 'Nenhum URL de download disponível. Execute /api/updates/check primeiro.' });
+  }
+
+  const targetFileName = updateState.assetName || `FYXXSSH-Setup-v${updateState.latestVersion}.exe`;
+  const destPath = path.join(UPDATES_DIR, targetFileName);
+
+  updateState.status = 'downloading';
+  updateState.progress = 0;
+  updateState.transferredBytes = 0;
+  updateState.errorMessage = null;
+
+  // Responde imediatamente para o cliente iniciar o polling de progresso
+  res.json({ success: true, message: 'Download iniciado', state: updateState });
+
+  downloadFileWithRedirects(updateState.downloadUrl, destPath, (transferred, total) => {
+    updateState.transferredBytes = transferred;
+    updateState.totalBytes = total || updateState.totalBytes;
+    if (updateState.totalBytes > 0) {
+      updateState.progress = Math.min(100, Math.round((transferred / updateState.totalBytes) * 100));
+    }
+  }).then(() => {
+    updateState.status = 'ready';
+    updateState.progress = 100;
+    updateState.localInstallerPath = destPath;
+  }).catch(err => {
+    updateState.status = 'error';
+    updateState.errorMessage = err.message;
+  });
+});
+
+// ROTA 4: Executar instalador e fechar o app
+app.post('/api/updates/install', (req, res) => {
+  const installerPath = updateState.localInstallerPath;
+  if (!installerPath || !fs.existsSync(installerPath)) {
+    return res.status(400).json({ success: false, error: 'Arquivo do instalador não encontrado.' });
+  }
+
+  try {
+    const { spawn } = require('child_process');
+    // Inicia o instalador em processo desanexado do Node
+    const child = spawn(installerPath, [], {
+      detached: true,
+      stdio: 'ignore'
+    });
+    child.unref();
+
+    res.json({ success: true, message: 'Instalador iniciado com sucesso. O FYXXSSH será reiniciado.' });
+
+    // Encerra a instância atual após breve pausa para dar tempo de responder
+    setTimeout(() => {
+      process.exit(0);
+    }, 1200);
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Falha ao iniciar o instalador: ' + err.message });
+  }
+});
 
 function createSFTPClient(host) {
   return new Promise((resolve, reject) => {

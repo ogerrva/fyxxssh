@@ -348,20 +348,25 @@ function switchMainView(viewName) {
   if (viewName === 'home') {
     homeView.classList.add('active');
     sessionView.classList.remove('active');
+    homeView.style.display = 'flex';
+    sessionView.style.display = 'none';
     navHomeBtn.classList.add('active');
     navSessionBtn.classList.remove('active');
     breadcrumbs.innerHTML = '<span class="crumb-root">Dashboard / Início</span>';
   } else if (viewName === 'session') {
-    if (!activeSession) {
+    if (!activeSession && sessionTabs.length === 0) {
       showToast('Nenhuma sessão SSH ativa no momento.', 'info');
       return;
     }
     homeView.classList.remove('active');
     sessionView.classList.add('active');
+    homeView.style.display = 'none';
+    sessionView.style.display = 'flex';
     navHomeBtn.classList.remove('active');
     navSessionBtn.classList.add('active');
     navSessionBtn.style.display = 'flex';
-    breadcrumbs.innerHTML = `<span class="crumb-root" onclick="switchMainView('home')">Início</span> <span class="crumb-sep">></span> <span class="crumb-current">${escapeHtml(activeSession.hostName)}</span>`;
+    const hostName = activeSession ? activeSession.hostName : (sessionTabs[0] ? sessionTabs[0].hostName : 'Sessão');
+    breadcrumbs.innerHTML = `<span class="crumb-root" onclick="switchMainView('home')">Início</span> <span class="crumb-sep">></span> <span class="crumb-current">${escapeHtml(hostName)}</span>`;
     
     setTimeout(fitActiveTerminal, 50); setTimeout(fitActiveTerminal, 200);
   }
@@ -933,16 +938,33 @@ function renderSessionTabsList() {
 }
 
 function closeActiveTab(tabIdToClose = null, event = null) {
-  if (event) event.stopPropagation();
+  if (event && event.stopPropagation) event.stopPropagation();
+  if (tabIdToClose && tabIdToClose.stopPropagation) {
+    tabIdToClose.stopPropagation();
+    tabIdToClose = null;
+  }
 
-  const id = tabIdToClose || activeTabId;
-  const tabIndex = sessionTabs.findIndex(t => t.id === id);
-  if (tabIndex === -1) return;
+  // Identifica a aba a fechar
+  const id = (typeof tabIdToClose === 'string' && tabIdToClose) ? tabIdToClose : activeTabId;
+  let tabIndex = sessionTabs.findIndex(t => t.id === id);
+
+  // Se não localizou pelo ID especificado, pega a aba ativa ou a última
+  if (tabIndex === -1 && sessionTabs.length > 0) {
+    tabIndex = sessionTabs.length - 1;
+  }
+
+  if (tabIndex === -1) {
+    return closeActiveSession();
+  }
 
   const tab = sessionTabs[tabIndex];
 
   try {
-    if (tab.socket) tab.socket.close();
+    if (tab.socket) {
+      tab.socket.onclose = null;
+      tab.socket.onerror = null;
+      tab.socket.close();
+    }
     if (tab.xterm) tab.xterm.dispose();
     if (tab.containerEl) tab.containerEl.remove();
   } catch(e) {}
@@ -965,7 +987,11 @@ function closeActiveSession() {
 
   sessionTabs.forEach(tab => {
     try {
-      if (tab.socket) tab.socket.close();
+      if (tab.socket) {
+        tab.socket.onclose = null;
+        tab.socket.onerror = null;
+        tab.socket.close();
+      }
       if (tab.xterm) tab.xterm.dispose();
       if (tab.containerEl) tab.containerEl.remove();
     } catch(e) {}
@@ -973,12 +999,19 @@ function closeActiveSession() {
 
   sessionTabs = [];
   activeTabId = null;
+  activeSession = null;
+
+  // Limpa containers visuais no DOM
+  const tabsList = document.getElementById('sessionTabsList');
+  if (tabsList) tabsList.innerHTML = '';
+  const xtermContainer = document.getElementById('xtermContainer');
+  if (xtermContainer) xtermContainer.innerHTML = '';
 
   document.getElementById('navSessionBtn').style.display = 'none';
   document.getElementById('globalStatusText').textContent = 'Desconectado';
   document.getElementById('globalStatusTag').classList.remove('online');
   switchMainView('home');
-  showToast('Sessão encerrada.', 'info');
+  showToast('Conexão encerrada com sucesso.', 'info');
 }
 
 let windowResizeTimer = null;

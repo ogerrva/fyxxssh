@@ -924,14 +924,37 @@ code, pre, .mono {
 }
 
 .view-panel {
-  display: none;
+  display: none !important;
   flex: 1;
   overflow-y: auto;
 }
 
 .view-panel.active {
-  display: flex;
+  display: flex !important;
   flex-direction: column;
+}
+
+#homeView.active {
+  display: flex !important;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+}
+
+#homeView:not(.active) {
+  display: none !important;
+}
+
+#sessionView.active {
+  display: flex !important;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+#sessionView:not(.active) {
+  display: none !important;
 }
 
 /* ================= HOME CLEAN ================= */
@@ -1396,13 +1419,6 @@ code, pre, .mono {
 }
 
 /* ================= VIEW DE SESSÃO & MODELOS ================= */
-#sessionView {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 .session-info {
   display: flex;
   align-items: center;

@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ogerrva/fyxxssh/releases/latest"><img src="https://img.shields.io/badge/Release-v1.0.5-purple?style=for-the-badge&logo=windows" alt="Release v1.0.5"></a>
-  <a href="https://github.com/ogerrva/fyxxssh/releases/download/v1.0.5/FYXXSSH-Setup-v1.0.5.exe"><img src="https://img.shields.io/badge/Download-Instalador%20.EXE-blue?style=for-the-badge&logo=electron" alt="Download EXE"></a>
+  <a href="https://github.com/ogerrva/fyxxssh/releases/latest"><img src="https://img.shields.io/badge/Release-v1.0.6-purple?style=for-the-badge&logo=windows" alt="Release v1.0.6"></a>
+  <a href="https://github.com/ogerrva/fyxxssh/releases/download/v1.0.6/FYXXSSH-Setup-v1.0.6.exe"><img src="https://img.shields.io/badge/Download-Instalador%20.EXE-blue?style=for-the-badge&logo=electron" alt="Download EXE"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License MIT"></a>
 </p>
 
@@ -18,7 +18,7 @@
 
 ## 🚀 Baixar Agora
 
-👉 **[Clique aqui para baixar o Instalador Oficial: FYXXSSH-Setup-v1.0.5.exe](https://github.com/ogerrva/fyxxssh/releases/download/v1.0.5/FYXXSSH-Setup-v1.0.5.exe)**
+👉 **[Clique aqui para baixar o Instalador Oficial: FYXXSSH-Setup-v1.0.6.exe](https://github.com/ogerrva/fyxxssh/releases/download/v1.0.6/FYXXSSH-Setup-v1.0.6.exe)**
 
 Também disponível a página web oficial: **[https://ogerrva.github.io/fyxxssh/](https://ogerrva.github.io/fyxxssh/)**
 
